@@ -198,16 +198,6 @@ type GroundnutIncome = {
   notes: string | null;
 };
 
-type GroundnutActivity = {
-  id: string;
-  cultivation_id: string;
-  activity_date: string;
-  activity_type: string;
-  crop_stage: string | null;
-  notes: string | null;
-  amount: number;
-};
-
 type ActivityField = {
   name: string;
   type: "date" | "text" | "number" | "select";
@@ -384,28 +374,6 @@ const GROUNDNUT_EXPENSE_TYPES = [
   { value: "drying_bagging", en: "Drying & Bagging", ta: "உலர்த்துதல் & பையில் அடைத்தல்" },
   { value: "dry_leaf_rolling", en: "Dry Leaf Rolling", ta: "உலர் இலை சுருட்டுதல்" },
 ];
-
-// Groundnut activity types
-const GROUNDNUT_ACTIVITY_TYPES = [
-  { value: "land_preparation", en: "Land Preparation", ta: "நிலம் தயாரிப்பு" },
-  { value: "seed_sowing", en: "Seed Sowing", ta: "விதை விதைத்தல்" },
-  { value: "weed_removal", en: "Weed Removal", ta: "களை எடுத்தல்" },
-  { value: "fertilizer", en: "Fertilizer Application", ta: "உரம் இடுதல்" },
-  { value: "harvesting", en: "Harvesting", ta: "அறுவடை" },
-  { value: "drying", en: "Drying", ta: "உலர்த்துதல்" },
-  { value: "other", en: "Other", ta: "மற்றவை" },
-];
-
-// Groundnut crop stages
-const GROUNDNUT_STAGES = [
-  { value: "germination", en: "Germination", ta: "முளைத்தல்" },
-  { value: "vegetative", en: "Vegetative Growth", ta: "வளர்ச்சி நிலை" },
-  { value: "flowering", en: "Flowering", ta: "பூக்கும் நிலை" },
-  { value: "pegging", en: "Pegging", ta: "காய்பிடிக்கும் நிலை" },
-  { value: "pod_development", en: "Pod Development", ta: "காய் வளர்ச்சி" },
-  { value: "maturity", en: "Maturity / Harvest", ta: "முதிர்வு / அறுவடை" },
-];
-
 
 const formatDMY = (iso: string | null | undefined) => {
   if (!iso) return "";
@@ -973,15 +941,6 @@ export default function CropDetail() {
   const [groundnutIncomeNotes, setGroundnutIncomeNotes] = useState("");
   const [savingGroundnutIncome, setSavingGroundnutIncome] = useState(false);
 
-  // ── Groundnut Activities ──
-  const [groundnutActivities, setGroundnutActivities] = useState<GroundnutActivity[]>([]);
-  const [groundnutActivityType, setGroundnutActivityType] = useState("land_preparation");
-  const [groundnutActivityDate, setGroundnutActivityDate] = useState("");
-  const [groundnutActivityStage, setGroundnutActivityStage] = useState("");
-  const [groundnutActivityNotes, setGroundnutActivityNotes] = useState("");
-  const [groundnutActivityAmount, setGroundnutActivityAmount] = useState("");
-  const [savingGroundnutActivity, setSavingGroundnutActivity] = useState(false);
-
   useEffect(() => {
     if (id) {
       fetchCultivation();
@@ -1018,7 +977,6 @@ export default function CropDetail() {
       fetchGroundnutDetails();
       fetchGroundnutExpenses();
       fetchGroundnutIncomes();
-      fetchGroundnutActivities();
     }
   }, [isGroundnut, id]);
 
@@ -1223,15 +1181,6 @@ export default function CropDetail() {
       .eq("cultivation_id", id)
       .order("harvest_date", { ascending: false });
     if (!error && data) setGroundnutIncomes(data);
-  };
-
-  const fetchGroundnutActivities = async () => {
-    const { data, error } = await supabase
-      .from("groundnut_activities")
-      .select("*")
-      .eq("cultivation_id", id)
-      .order("activity_date", { ascending: false });
-    if (!error && data) setGroundnutActivities(data);
   };
 
   const fetchIncomeRecords = async () => {
@@ -1555,45 +1504,6 @@ export default function CropDetail() {
     setSavingGroundnutIncome(false);
   };
 
-  // ---- Groundnut activities ----
-  const saveGroundnutActivity = async () => {
-    if (!groundnutActivityDate) {
-      toast.error(L("Date required", "தேதி தேவை"));
-      return;
-    }
-    if (isFutureDate(groundnutActivityDate)) {
-      toast.error(L("Future date not allowed", "எதிர்கால தேதி அனுமதிக்கப்படவில்லை"));
-      return;
-    }
-
-    setSavingGroundnutActivity(true);
-    try {
-      const { error } = await supabase.from("groundnut_activities").insert({
-        cultivation_id: id,
-        activity_date: groundnutActivityDate,
-        activity_type: groundnutActivityType,
-        crop_stage: groundnutActivityStage || null,
-        notes: groundnutActivityNotes.trim() || null,
-        amount: Number(groundnutActivityAmount) || 0,
-      });
-
-      if (error) reportError("Error saving activity", error.message);
-      else {
-        toast.success(L("✅ Activity saved!", "✅ செயல்பாடு சேமிக்கப்பட்டது!"));
-
-        setGroundnutActivityDate("");
-        setGroundnutActivityStage("");
-        setGroundnutActivityNotes("");
-        setGroundnutActivityAmount("");
-
-        fetchGroundnutActivities();
-      }
-    } catch (err) {
-      reportError("Unexpected error", err instanceof Error ? err.message : String(err));
-    }
-    setSavingGroundnutActivity(false);
-  };
-
   const deleteGroundnutExpense = (expId: string) => {
     confirmDelete(async () => {
       const { error } = await supabase.from("groundnut_expenses").delete().eq("id", expId);
@@ -1614,17 +1524,6 @@ export default function CropDetail() {
         toast.success(L("✅ Deleted!", "✅ நீக்கப்பட்டது!"));
         fetchGroundnutIncomes();
         await ActivityLog.deleted("Income", "Groundnut income deleted");
-      }
-    });
-  };
-
-  const deleteGroundnutActivity = (actId: string) => {
-    confirmDelete(async () => {
-      const { error } = await supabase.from("groundnut_activities").delete().eq("id", actId);
-      if (error) reportError("Error deleting record", error.message);
-      else {
-        toast.success(L("✅ Deleted!", "✅ நீக்கப்பட்டது!"));
-        fetchGroundnutActivities();
       }
     });
   };
@@ -4907,7 +4806,7 @@ export default function CropDetail() {
                 </div>
               )}
 
-              {!isTurmeric && !isGroundnut && (
+              {!isTurmeric && (
                 <>
               {/* Fertilizer */}
               <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3">
@@ -5031,138 +4930,6 @@ export default function CropDetail() {
               </div>
 
                 </>
-              )}
-
-              {isGroundnut && (
-                <div className="space-y-4">
-                  {/* ── ADD ACTIVITY ── */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                      🥜 {L("Add Activity", "செயல்பாடு சேர்")}
-                    </h2>
-
-                    <div className="space-y-3">
-                      {/* Activity type */}
-                      <div>
-                        <label className={labelCls}>{L("Activity Type", "செயல்பாடு வகை")}</label>
-                        <select value={groundnutActivityType} onChange={(e) => setGroundnutActivityType(e.target.value)} className={inputCls}>
-                          {GROUNDNUT_ACTIVITY_TYPES.map((t) => (
-                            <option className="text-gray-900" key={t.value} value={t.value}>
-                              {L(t.en, t.ta)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Crop stage — only for fertilizer */}
-                      {groundnutActivityType === "fertilizer" && (
-                        <div>
-                          <label className={labelCls}>{L("Crop Stage", "பயிர் நிலை")}</label>
-                          <select value={groundnutActivityStage} onChange={(e) => setGroundnutActivityStage(e.target.value)} className={inputCls}>
-                            <option className="text-gray-900" value="">
-                              {L("Select stage", "நிலையை தேர்ந்தெடு")}
-                            </option>
-                            {GROUNDNUT_STAGES.map((s) => (
-                              <option className="text-gray-900" key={s.value} value={s.value}>
-                                {L(s.en, s.ta)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Date */}
-                      <div>
-                        <label className={labelCls}>{L("Date", "தேதி")}</label>
-                        <input
-                          type="date"
-                          max={new Date().toISOString().split("T")[0]}
-                          value={groundnutActivityDate}
-                          onChange={(e) => setGroundnutActivityDate(e.target.value)}
-                          className={inputCls}
-                        />
-                      </div>
-
-                      {/* Cost (optional) */}
-                      <div>
-                        <label className={labelCls}>{L("Cost (₹, optional)", "செலவு (₹, விருப்பம்)")}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={groundnutActivityAmount}
-                          onChange={(e) => setGroundnutActivityAmount(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "-") e.preventDefault();
-                          }}
-                          className={inputCls}
-                        />
-                      </div>
-
-                      {/* Notes */}
-                      <div>
-                        <label className={labelCls}>{L("Notes (optional)", "குறிப்பு (விருப்பம்)")}</label>
-                        <input
-                          type="text"
-                          value={groundnutActivityNotes}
-                          onChange={(e) => setGroundnutActivityNotes(e.target.value)}
-                          className={inputCls}
-                        />
-                      </div>
-
-                      {/* Save button */}
-                      <button
-                        onClick={saveGroundnutActivity}
-                        disabled={savingGroundnutActivity}
-                        className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-xl py-2.5 text-sm font-medium transition"
-                      >
-                        {savingGroundnutActivity ? "..." : L("Add Activity", "செயல்பாடு சேர்")}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* ── ACTIVITY RECORDS ── */}
-                  {groundnutActivities.length > 0 && (
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                      <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                        📋 {L("Activity Records", "செயல்பாடு பதிவுகள்")}
-                      </h2>
-
-                      <div className="space-y-2">
-                        {groundnutActivities.map((act) => {
-                          const actType = GROUNDNUT_ACTIVITY_TYPES.find((t) => t.value === act.activity_type);
-                          const stage = GROUNDNUT_STAGES.find((s) => s.value === act.crop_stage);
-                          return (
-                            <div key={act.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-slate-700 last:border-0">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                                  {L(actType?.en || act.activity_type, actType?.ta || act.activity_type)}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  {act.activity_date}
-                                  {stage ? ` · ${L(stage.en, stage.ta)}` : ""}
-                                  {act.notes ? ` · ${act.notes}` : ""}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 ml-2">
-                                {act.amount > 0 && (
-                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
-                                    ₹{Number(act.amount).toLocaleString("en-IN")}
-                                  </p>
-                                )}
-                                <button
-                                  onClick={() => deleteGroundnutActivity(act.id)}
-                                  className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
               )}
 
             </div>
