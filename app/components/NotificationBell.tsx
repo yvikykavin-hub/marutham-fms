@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getTractorOilStatus } from "../lib/tractorOilStatus";
 import { calculateCurrentTurn, formatTurnEndTime } from "../lib/motorTurnCalculator";
 
-type Severity = "danger" | "warning" | "info";
+type Severity = "danger" | "warning" | "info" | "success";
 
 type NotificationItem = {
   id: string;
@@ -14,6 +15,8 @@ type NotificationItem = {
   icon: string;
   title: string;
   message: string;
+  time?: string;
+  urgentMessage?: string;
 };
 
 const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
@@ -262,6 +265,7 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
               lang === "ta"
                 ? `${Math.round(turnStatus.hoursRemaining)} மணி நேரத்தில் முடியும்`
                 : `Ends in ${Math.round(turnStatus.hoursRemaining)} hour(s)`,
+            urgentMessage: lang === "ta" ? "விரைவில் பாசனம் முடிக்கவும்!" : "Complete your watering now!",
           });
         } else if (!turnStatus.isMyTurn && turnStatus.hoursRemaining > 0 && turnStatus.hoursRemaining <= 2) {
           detected.push({
@@ -315,13 +319,21 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
             myTurnMessage = lang === "ta" ? `உங்கள் முறை ${endStr} வரை தொடரும்.` : `Your turn continues until ${endStr}.`;
           }
 
-          detected.push({
-            id: `motor-my-turn-${motor.id}-${todayStr}`,
-            severity: "warning",
-            icon: "🚰",
-            title: myTurnTitle,
-            message: myTurnMessage,
-          });
+          // Skip the "today" card if the more urgent "ending soon" card
+          // (pushed above) already covers this exact turn — otherwise the
+          // same turn shows up as two separate notifications at once.
+          const endingSoonId = `motor-ending-${motor.id}-${motor.current_turn_start}`;
+          const alreadyHasEndingSoon = detected.some((n) => n.id === endingSoonId);
+
+          if (!alreadyHasEndingSoon) {
+            detected.push({
+              id: `motor-my-turn-${motor.id}-${todayStr}`,
+              severity: turnStatus.endsToday ? "warning" : "success",
+              icon: turnStatus.endsToday ? "⏰" : "🚰",
+              title: myTurnTitle,
+              message: myTurnMessage,
+            });
+          }
         } else {
           const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
           const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
@@ -387,9 +399,34 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
   };
 
   const severityCls: Record<Severity, string> = {
-    danger: "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-300",
-    warning: "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300",
-    info: "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
+    danger: "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30",
+    warning: "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30",
+    info: "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30",
+    success: "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30",
+  };
+  const severityTextCls: Record<Severity, string> = {
+    danger: "text-red-800 dark:text-red-300",
+    warning: "text-amber-800 dark:text-amber-300",
+    info: "text-blue-800 dark:text-blue-300",
+    success: "text-green-800 dark:text-green-300",
+  };
+  const severitySubTextCls: Record<Severity, string> = {
+    danger: "text-red-600 dark:text-red-400",
+    warning: "text-amber-600 dark:text-amber-400",
+    info: "text-blue-600 dark:text-blue-400",
+    success: "text-green-600 dark:text-green-400",
+  };
+  const severityIconBgCls: Record<Severity, string> = {
+    danger: "bg-red-100 dark:bg-red-900/30",
+    warning: "bg-amber-100 dark:bg-amber-900/30",
+    info: "bg-blue-100 dark:bg-blue-900/30",
+    success: "bg-green-100 dark:bg-green-900/30",
+  };
+  const severityDotCls: Record<Severity, string> = {
+    danger: "bg-red-500",
+    warning: "bg-amber-500",
+    info: "bg-blue-500",
+    success: "bg-green-500",
   };
 
   const handleBellClick = () => {
@@ -455,83 +492,81 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
             </div>
           ) : (
             <div className="p-2 space-y-1.5">
-              {items.map((item) => {
-                const isMotorMyTurn = item.id.startsWith("motor-my-turn");
-                const isMotorNeighborTurn = item.id.startsWith("motor-neighbor-turn");
-                const isMotorNotification = isMotorMyTurn || isMotorNeighborTurn;
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-2.5 rounded-xl text-sm border transition-all duration-200 ${
-                      isMotorMyTurn
-                        ? "bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/30 dark:to-cyan-900/30 border-teal-200 dark:border-teal-700/50"
-                        : isMotorNeighborTurn
-                          ? "bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600/50"
-                          : severityCls[item.severity]
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      {isMotorNotification ? (
-                        <div
-                          className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
-                            isMotorMyTurn ? "bg-teal-100 dark:bg-teal-900/40" : "bg-slate-100 dark:bg-slate-600/40"
-                          }`}
-                        >
-                          <span className="text-base">{item.icon}</span>
-                        </div>
-                      ) : (
-                        <span className="text-base shrink-0">{item.icon}</span>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`font-medium leading-tight ${
-                            isMotorMyTurn
-                              ? "text-teal-800 dark:text-teal-300"
-                              : isMotorNeighborTurn
-                                ? "text-slate-700 dark:text-slate-300"
-                                : ""
-                          }`}
-                        >
-                          {item.title}
-                        </p>
-                        <p
-                          className={`text-xs mt-0.5 leading-relaxed ${
-                            isMotorMyTurn
-                              ? "text-teal-600 dark:text-teal-400"
-                              : isMotorNeighborTurn
-                                ? "text-slate-500 dark:text-slate-400"
-                                : "opacity-70"
-                          }`}
-                        >
-                          {item.message}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dismiss(item.id);
-                        }}
-                        className="min-h-[24px] min-w-[24px] flex items-center justify-center text-current opacity-60 hover:opacity-100 shrink-0"
-                      >
-                        ×
-                      </button>
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className={`p-2.5 rounded-xl text-sm border transition-all duration-200 ${severityCls[item.severity] || severityCls.info}`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    {/* Icon badge */}
+                    <div
+                      className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
+                        severityIconBgCls[item.severity] || severityIconBgCls.info
+                      }`}
+                    >
+                      <span className="text-base">{item.icon}</span>
                     </div>
 
-                    {/* Special bottom bar for MY turn */}
-                    {isMotorMyTurn && (
-                      <div className="mt-2 pt-2 border-t border-teal-100 dark:border-teal-800/30 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                        <p className="text-xs text-teal-600 dark:text-teal-400 font-medium">
-                          {language === "ta" ? "இப்போதே பாசனம் செய்யலாம்" : "Water your fields now"}
+                    <div className="flex-1 min-w-0">
+                      {/* Title */}
+                      <p className={`font-medium leading-tight ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.title}</p>
+
+                      {/* Message */}
+                      {item.message && (
+                        <p className={`text-xs mt-0.5 leading-relaxed ${severitySubTextCls[item.severity] || severitySubTextCls.info}`}>
+                          {item.message}
                         </p>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Time */}
+                      {item.time && (
+                        <p className={`text-xs mt-1 opacity-60 ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.time}</p>
+                      )}
+                    </div>
+
+                    {/* Dismiss button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismiss(item.id);
+                      }}
+                      className={`min-h-[24px] min-w-[24px] flex items-center justify-center text-current opacity-50 hover:opacity-100 shrink-0 rounded-lg transition-opacity ${
+                        severityTextCls[item.severity] || severityTextCls.info
+                      }`}
+                    >
+                      ×
+                    </button>
                   </div>
-                );
-              })}
+
+                  {/* Bottom bar for urgent items */}
+                  {item.severity === "danger" && (
+                    <div className="mt-2 pt-2 border-t border-red-100 dark:border-red-800/30 flex items-center gap-1.5">
+                      <motion.div
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className={`w-1.5 h-1.5 rounded-full ${severityDotCls.danger}`}
+                      />
+                      <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                        {item.urgentMessage || (language === "ta" ? "உடனடி நடவடிக்கை தேவை" : "Immediate action required")}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Bottom bar for active motor turn */}
+                  {item.severity === "success" && item.id.startsWith("motor-my-turn") && (
+                    <div className="mt-2 pt-2 border-t border-green-100 dark:border-green-800/30 flex items-center gap-1.5">
+                      <motion.div
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className={`w-1.5 h-1.5 rounded-full ${severityDotCls.success}`}
+                      />
+                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        {language === "ta" ? "இப்போதே பாசனம் செய்யலாம்" : "You can water your fields now"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

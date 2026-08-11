@@ -542,54 +542,77 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
                                         : "bg-white dark:bg-slate-700/50 border-gray-100 dark:border-slate-600/30"
                                   }`}
                                 >
-                                  <div className="flex items-center justify-between">
+                                  {/* Top row: name + badge */}
+                                  <div className="flex items-center justify-between mb-1.5">
                                     <div className="flex items-center gap-2">
+                                      {/* Pulsing dot for current */}
                                       {entry.isCurrent && (
                                         <motion.div
                                           animate={{ opacity: [1, 0.3, 1] }}
                                           transition={{ duration: 1.5, repeat: Infinity }}
-                                          className="w-2 h-2 rounded-full bg-green-500"
+                                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"
                                         />
                                       )}
 
-                                      <div>
-                                        <p
-                                          className={`text-sm font-semibold ${
-                                            entry.isCurrent
-                                              ? "text-green-700 dark:text-green-400"
-                                              : entry.isMe
-                                                ? "text-blue-700 dark:text-blue-400"
-                                                : "text-gray-700 dark:text-gray-300"
-                                          }`}
-                                        >
-                                          {entry.isMe ? (language === "ta" ? "👤 நீங்கள்" : "👤 You") : `👤 ${displayName}`}
-                                          {entry.isCurrent && (
-                                            <span className="ml-1.5 text-xs font-normal text-green-600 dark:text-green-400">
-                                              {language === "ta" ? "(தொடர்கிறது)" : "(Active)"}
-                                            </span>
-                                          )}
-                                        </p>
-
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                          {startStr} {startTimeStr}
-                                          {" → "}
-                                          {endStr} {endTimeStr}
-                                        </p>
-                                      </div>
+                                      {/* Person name */}
+                                      <p
+                                        className={`text-sm font-semibold ${
+                                          entry.isCurrent
+                                            ? "text-green-700 dark:text-green-400"
+                                            : entry.isMe
+                                              ? "text-blue-700 dark:text-blue-400"
+                                              : "text-gray-700 dark:text-gray-300"
+                                        }`}
+                                      >
+                                        {entry.isMe ? (language === "ta" ? "👤 நீங்கள்" : "👤 You") : `👤 ${displayName}`}
+                                      </p>
                                     </div>
 
-                                    <div
-                                      className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                                    {/* Status badge */}
+                                    <span
+                                      className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
                                         entry.isCurrent
                                           ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400"
-                                          : "bg-gray-100 dark:bg-slate-600/50 text-gray-400 dark:text-gray-400"
+                                          : entry.isPast
+                                            ? "bg-gray-100 dark:bg-slate-600/50 text-gray-400 dark:text-gray-500"
+                                            : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
                                       }`}
                                     >
                                       {entry.isPast
                                         ? language === "ta" ? "முடிந்தது" : "Done"
                                         : entry.isCurrent
-                                          ? language === "ta" ? "இப்போது" : "Now"
-                                          : language === "ta" ? "வரும்" : "Upcoming"}
+                                          ? language === "ta" ? "இப்போது" : "Active"
+                                          : language === "ta" ? "வரும்" : "Soon"}
+                                    </span>
+                                  </div>
+
+                                  {/* Bottom rows: dates on separate lines, so long
+                                      date/time strings never get squeezed on a
+                                      narrow screen the way the single-line
+                                      "start → end" layout did. */}
+                                  <div className="flex flex-col gap-0.5 pl-4">
+                                    {/* Start */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs text-green-500 dark:text-green-400 font-medium w-10 flex-shrink-0">
+                                        {language === "ta" ? "தொடக்கம்" : "From"}
+                                      </span>
+                                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        {startStr}
+                                        <span className="text-gray-400 dark:text-gray-500 mx-1">•</span>
+                                        {startTimeStr}
+                                      </span>
+                                    </div>
+
+                                    {/* End */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs text-red-400 dark:text-red-400 font-medium w-10 flex-shrink-0">
+                                        {language === "ta" ? "முடிவு" : "Until"}
+                                      </span>
+                                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        {endStr}
+                                        <span className="text-gray-400 dark:text-gray-500 mx-1">•</span>
+                                        {endTimeStr}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
