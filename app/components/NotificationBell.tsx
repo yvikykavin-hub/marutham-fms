@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getTractorOilStatus } from "../lib/tractorOilStatus";
-import { calculateCurrentTurn, getNextTurnInfo } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime } from "../lib/motorTurnCalculator";
 
 type Severity = "danger" | "warning" | "info";
 
@@ -284,12 +284,20 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
         const todayStr = new Date().toISOString().split("T")[0];
 
         if (turnStatus.isMyTurn) {
-          // Staged wording so the card reads differently on the last day of
-          // the turn (exact 6 PM hand-off time) vs. an ordinary day with
-          // multiple days still remaining.
+          // Staged wording so the card reads differently right after the
+          // turn starts, on its last day, tomorrow, or an ordinary active
+          // day — using the actual end time (not a bare day-count) so it
+          // never reads as confusing right after the turn begins.
           let myTurnTitle: string;
           let myTurnMessage: string;
-          if (turnStatus.endsToday) {
+          if (turnStatus.justStarted) {
+            const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
+            myTurnTitle = lang === "ta" ? `🚰 ${motorFarmName} - உங்கள் முறை தொடங்கியது!` : `🚰 ${motorFarmName} - Your Turn Has Started!`;
+            myTurnMessage =
+              lang === "ta"
+                ? `இன்று மாலை 6:00 மணிக்கு தொடங்கியது. ${endStr} வரை உங்கள் முறை.`
+                : `Started today at 6:00 PM. Your turn continues until ${endStr}.`;
+          } else if (turnStatus.endsToday) {
             myTurnTitle = lang === "ta" ? `🚰 ${motorFarmName} - இன்று முறை முடியும்` : `🚰 ${motorFarmName} - Turn Ends Today`;
             myTurnMessage =
               lang === "ta"
@@ -302,11 +310,9 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
                 ? "உங்கள் பகிர்வு மோட்டார் முறை நாளை மாலை 6:00 மணிக்கு முடியும்."
                 : "Your shared motor turn ends tomorrow at 6:00 PM.";
           } else {
-            myTurnTitle = lang === "ta" ? `${motorFarmName} - இன்று உங்கள் முறை!` : `${motorFarmName} - Today is Your Turn!`;
-            myTurnMessage =
-              lang === "ta"
-                ? `${turnStatus.daysRemaining} நாள் உள்ளது - இப்போதே பாசனம் செய்யலாம்`
-                : `${turnStatus.daysRemaining} day(s) left - Water your fields now`;
+            const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
+            myTurnTitle = lang === "ta" ? `🚰 ${motorFarmName} - உங்கள் முறை தொடர்கிறது` : `🚰 ${motorFarmName} - Your Turn is Active`;
+            myTurnMessage = lang === "ta" ? `உங்கள் முறை ${endStr} வரை தொடரும்.` : `Your turn continues until ${endStr}.`;
           }
 
           detected.push({
@@ -317,13 +323,8 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
             message: myTurnMessage,
           });
         } else {
-          const next = getNextTurnInfo(
-            motor.current_turn_start,
-            motor.current_turn_owner,
-            Number(motor.current_turn_days) || 2,
-            partnersList
-          );
-          const daysRemaining = next ? Math.ceil(next.hoursUntilMyTurn / 24) : turnStatus.daysRemaining;
+          const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
+          const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
           detected.push({
             id: `motor-neighbor-turn-${motor.id}-${todayStr}`,
             severity: "info",
@@ -332,7 +333,10 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
               lang === "ta"
                 ? `${motorFarmName} - இன்று ${turnStatus.ownerName} முறை`
                 : `${motorFarmName} - Today is ${turnStatus.ownerName}'s Turn`,
-            message: lang === "ta" ? `${daysRemaining} நாளில் உங்கள் முறை வரும்` : `Your turn comes in ${daysRemaining} day(s)`,
+            message:
+              lang === "ta"
+                ? `அவர்கள் முறை ${endStr} முடியும். உங்கள் அடுத்த முறை ${myNextStr} தொடங்கும்.`
+                : `Their turn ends ${endStr}. Your next turn starts ${myNextStr}.`,
           });
         }
       });

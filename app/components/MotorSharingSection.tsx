@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getValidationMessage } from "../lib/validation";
-import { calculateCurrentTurn, formatTurnRemaining, getNextTurnInfo } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime, generateSchedule } from "../lib/motorTurnCalculator";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 
@@ -186,59 +186,17 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
       });
     };
 
-    // Calculate upcoming schedule. Duration is in fractional days (e.g. 0.5 =
-    // 12 hours), so end time is computed in milliseconds rather than via
-    // Date#setDate — which truncates fractional arguments to whole days.
-    // Whole-day turns still snap their handover to 6 PM as before; turns
-    // shorter than a day end exactly on time instead.
-    const getSchedule = () => {
-      if (!turnStart || !isShared) return [];
-
-      const schedule = [];
-      let currentDate = new Date(turnStart);
-      const allParticipants = [
-        { name: "me", days: effectiveTurnDays },
-        ...partners.map((p) => ({ name: p.partner_name, days: p.turn_days })),
-      ];
-
-      let participantIndex = allParticipants.findIndex((p) => p.name === turnOwner);
-      if (participantIndex === -1) participantIndex = 0;
-
-      for (let i = 0; i < 6; i++) {
-        const participant = allParticipants[participantIndex % allParticipants.length];
-        const endDate = new Date(currentDate.getTime() + participant.days * HOURS_PER_DAY * 60 * 60 * 1000);
-        if (participant.days >= 1) {
-          endDate.setHours(18, 0, 0, 0);
-        }
-
-        schedule.push({
-          owner: participant.name,
-          start: new Date(currentDate),
-          end: endDate,
-          isMe: participant.name === "me",
-        });
-
-        currentDate = new Date(endDate);
-        participantIndex++;
-      }
-
-      return schedule;
-    };
-
-    const isMyTurnNow = () => {
-      if (!sharing?.current_turn_start) return false;
-      const schedule = getSchedule();
-      const now = new Date();
-      const myTurn = schedule.find((s) => s.isMe);
-      if (!myTurn) return false;
-      return now >= myTurn.start && now <= myTurn.end;
-    };
+    // Display name for owner — "me" reads as "You"/"நீங்கள்", everyone else
+    // (a shared partner's actual name) passes through unchanged.
+    const getDisplayName = (name: string) => (name === "me" ? (language === "ta" ? "நீங்கள்" : "You") : name);
 
     if (loading) return null;
 
     // Turn hand-off happens at 6 PM, not midnight — calculateCurrentTurn walks
     // the rotation using the real current time so this stays correct no matter
-    // how long ago the rotation was originally configured.
+    // how long ago the rotation was originally configured. Both the status
+    // banner and the schedule below are derived from this same saved
+    // sharing/partners data, so they can never disagree with each other.
     const partnersList = partners.map((p) => ({ name: p.partner_name, days: Number(p.turn_days) || 2 }));
     const turnStatus =
       isShared && sharing?.current_turn_start
@@ -249,6 +207,23 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
             partnersList
           )
         : null;
+    const isMyTurnNow = turnStatus?.isMyTurn ?? false;
+
+    // Full upcoming/past schedule — last 3 days through next 30 days —
+    // computed from the same saved sharing data as turnStatus above.
+    const scheduleEntries =
+      isShared && sharing?.current_turn_start
+        ? generateSchedule(
+            sharing.current_turn_start,
+            sharing.current_turn_owner,
+            Number(sharing.current_turn_days) || 2,
+            partnersList
+          )
+        : [];
+    const displayNameMap: Record<string, string> = { me: getDisplayName("me") };
+    partners.forEach((p) => {
+      displayNameMap[p.partner_name] = p.partner_name;
+    });
 
     return (
       <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
@@ -256,7 +231,7 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className={sectionTitleCls}>{language === "ta" ? "🚰 பகிர்வு மோட்டார்" : "🚰 Shared Motor"}</span>
-            {isMyTurnNow() && (
+            {isMyTurnNow && (
               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium animate-pulse">
                 🟢 {language === "ta" ? "உங்கள் முறை!" : "Your turn!"}
               </span>
@@ -317,10 +292,12 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
                     className="text-white font-semibold text-sm leading-tight"
                   >
                     {turnStatus.isMyTurn
-                      ? turnStatus.endingSoon
-                        ? language === "ta" ? "⏰ உங்கள் முறை முடியும்!" : "⏰ Your Turn Ends Soon!"
-                        : language === "ta" ? "✅ இன்று உங்கள் முறை!" : "✅ Today is Your Turn!"
-                      : language === "ta" ? `🔄 இன்று ${turnStatus.ownerName} முறை` : `🔄 Today is ${turnStatus.ownerName}'s Turn`}
+                      ? turnStatus.justStarted
+                        ? language === "ta" ? "✅ உங்கள் முறை தொடங்கியது!" : "✅ Your Turn Has Started!"
+                        : turnStatus.endsToday
+                          ? language === "ta" ? "⏰ உங்கள் முறை இன்று முடியும்" : "⏰ Your Turn Ends Today"
+                          : language === "ta" ? "✅ உங்கள் முறை தொடர்கிறது" : "✅ Your Turn is Active"
+                      : language === "ta" ? `💧 ${getDisplayName(turnStatus.ownerName)} முறை தொடர்கிறது` : `💧 ${getDisplayName(turnStatus.ownerName)}'s Turn is Active`}
                   </motion.p>
                   <motion.p
                     initial={{ opacity: 0, x: -8 }}
@@ -329,18 +306,20 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
                     className="text-white/80 text-xs mt-0.5"
                   >
                     {turnStatus.isMyTurn
-                      ? formatTurnRemaining(turnStatus, language)
-                      : (() => {
-                          const next = getNextTurnInfo(
-                            sharing?.current_turn_start ?? "",
-                            sharing?.current_turn_owner ?? "",
-                            Number(sharing?.current_turn_days) || 2,
-                            partnersList
-                          );
-                          if (!next) return "";
-                          const days = Math.ceil(next.hoursUntilMyTurn / 24);
-                          return language === "ta" ? `${days} நாளில் உங்கள் முறை` : `Your turn in ${days} day${days > 1 ? "s" : ""}`;
-                        })()}
+                      ? turnStatus.justStarted
+                        ? language === "ta"
+                          ? `உங்கள் முறை ${formatTurnEndTime(turnStatus.turnEndTime, language)} வரை தொடரும்`
+                          : `Your turn continues until ${formatTurnEndTime(turnStatus.turnEndTime, language)}`
+                        : turnStatus.endsToday
+                          ? language === "ta"
+                            ? "இன்று மாலை 6:00 மணிக்கு முடியும். பாசனம் முடிக்கவும்."
+                            : "Ends today at 6:00 PM. Complete your watering."
+                          : language === "ta"
+                            ? `${formatTurnEndTime(turnStatus.turnEndTime, language)} வரை உங்கள் முறை`
+                            : `Ends ${formatTurnEndTime(turnStatus.turnEndTime, language)}`
+                      : language === "ta"
+                        ? `அவர்கள் முறை ${formatTurnEndTime(turnStatus.turnEndTime, language)} முடியும்`
+                        : `Their turn ends ${formatTurnEndTime(turnStatus.turnEndTime, language)}`}
                   </motion.p>
                 </div>
 
@@ -383,6 +362,17 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
                   </p>
                 </motion.div>
               )}
+
+              {/* Next turn info */}
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-white/70 text-xs mt-1.5">
+                {turnStatus.isMyTurn
+                  ? language === "ta"
+                    ? `அடுத்து: ${getDisplayName(turnStatus.nextOwnerName)} முறை ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)} முதல்`
+                    : `Next: ${getDisplayName(turnStatus.nextOwnerName)}'s turn from ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)}`
+                  : language === "ta"
+                    ? `உங்கள் அடுத்த முறை ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)} தொடங்கும்`
+                    : `Your next turn starts ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)}`}
+              </motion.p>
             </div>
           </motion.div>
         )}
@@ -533,26 +523,84 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
                         </button>
 
                         {showSchedule && (
-                          <div className="mt-2 space-y-1">
-                            {getSchedule()
-                              .slice(0, 5)
-                              .map((slot, i) => (
+                          <div className="mt-2 space-y-2">
+                            {scheduleEntries.map((entry, index) => {
+                              const startStr = entry.startTime.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                              const startTimeStr = entry.startTime.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+                              const endStr = entry.endTime.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                              const endTimeStr = entry.endTime.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+                              const displayName = displayNameMap[entry.ownerName] || entry.ownerName;
+
+                              return (
                                 <div
-                                  key={i}
-                                  className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs ${
-                                    slot.isMe ? "bg-green-50 dark:bg-green-900/20" : "bg-gray-50 dark:bg-slate-700/50"
+                                  key={index}
+                                  className={`rounded-xl p-3 border transition-all ${
+                                    entry.isCurrent
+                                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/50 shadow-sm"
+                                      : entry.isPast
+                                        ? "bg-gray-50 dark:bg-slate-700/30 border-gray-100 dark:border-slate-600/30 opacity-60"
+                                        : "bg-white dark:bg-slate-700/50 border-gray-100 dark:border-slate-600/30"
                                   }`}
                                 >
-                                  <span className={`font-medium ${slot.isMe ? "text-green-700 dark:text-green-300" : "text-gray-600 dark:text-gray-400"}`}>
-                                    {slot.isMe ? (language === "ta" ? "🟢 என் முறை" : "🟢 My turn") : `🔴 ${slot.owner}`}
-                                  </span>
-                                  <span className="text-gray-400">
-                                    {slot.start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                                    {" → "}
-                                    {slot.end.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                                  </span>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      {entry.isCurrent && (
+                                        <motion.div
+                                          animate={{ opacity: [1, 0.3, 1] }}
+                                          transition={{ duration: 1.5, repeat: Infinity }}
+                                          className="w-2 h-2 rounded-full bg-green-500"
+                                        />
+                                      )}
+
+                                      <div>
+                                        <p
+                                          className={`text-sm font-semibold ${
+                                            entry.isCurrent
+                                              ? "text-green-700 dark:text-green-400"
+                                              : entry.isMe
+                                                ? "text-blue-700 dark:text-blue-400"
+                                                : "text-gray-700 dark:text-gray-300"
+                                          }`}
+                                        >
+                                          {entry.isMe ? (language === "ta" ? "👤 நீங்கள்" : "👤 You") : `👤 ${displayName}`}
+                                          {entry.isCurrent && (
+                                            <span className="ml-1.5 text-xs font-normal text-green-600 dark:text-green-400">
+                                              {language === "ta" ? "(தொடர்கிறது)" : "(Active)"}
+                                            </span>
+                                          )}
+                                        </p>
+
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                          {startStr} {startTimeStr}
+                                          {" → "}
+                                          {endStr} {endTimeStr}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div
+                                      className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                                        entry.isCurrent
+                                          ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400"
+                                          : "bg-gray-100 dark:bg-slate-600/50 text-gray-400 dark:text-gray-400"
+                                      }`}
+                                    >
+                                      {entry.isPast
+                                        ? language === "ta" ? "முடிந்தது" : "Done"
+                                        : entry.isCurrent
+                                          ? language === "ta" ? "இப்போது" : "Now"
+                                          : language === "ta" ? "வரும்" : "Upcoming"}
+                                    </div>
+                                  </div>
                                 </div>
-                              ))}
+                              );
+                            })}
+
+                            {scheduleEntries.length === 0 && (
+                              <p className="text-xs text-center text-gray-400 dark:text-gray-500 py-4">
+                                {language === "ta" ? "அட்டவணை இல்லை" : "No schedule available"}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>

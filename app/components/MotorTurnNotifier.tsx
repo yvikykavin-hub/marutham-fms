@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { getTractorOilStatus } from "../lib/tractorOilStatus";
-import { calculateCurrentTurn, type TurnStatus } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime, type TurnStatus } from "../lib/motorTurnCalculator";
 
 const NOTIFICATION_CHECK_KEY = "marutham_last_notification_check";
 const DISMISSED_KEY = "marutham_dismissed_notifications";
@@ -37,16 +37,30 @@ const getFarmName = (farm: FarmRef): string => {
 };
 
 // Builds the right bilingual title/body for whichever stage of a shared
-// motor's turn is currently active — separate wording for "ends today",
-// "ends tomorrow", "still active with days left", and "not my turn" so a
-// farmer glancing at the notification knows exactly where things stand
-// without opening the app.
+// motor's turn is currently active — separate wording for "just started",
+// "ends today", "ends tomorrow", "still active until a given time", and
+// "not my turn" so a farmer glancing at the notification knows exactly
+// where things stand without opening the app. Uses formatTurnEndTime so
+// "active" never falls back to a bare day-count, which reads as confusing
+// right after a turn starts (e.g. "1 day left" for a 2-day turn that just began).
 const getMotorNotificationText = (
   turnStatus: TurnStatus,
   farmName: string,
   lang: string
 ): { title: string; body: string; urgent: boolean } => {
   const L = (en: string, ta: string) => (lang === "ta" ? ta : en);
+
+  if (turnStatus.isMyTurn && turnStatus.justStarted) {
+    const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
+    return {
+      title: L(`🚰 ${farmName} - Your Turn Has Started!`, `🚰 ${farmName} - உங்கள் முறை தொடங்கியது!`),
+      body: L(
+        `Your shared motor turn has started today at 6:00 PM. Your turn continues until ${endStr}.`,
+        `உங்கள் பகிர்வு மோட்டார் முறை இன்று மாலை 6:00 மணிக்கு தொடங்கியது. ${endStr} வரை உங்கள் முறை.`
+      ),
+      urgent: true,
+    };
+  }
 
   if (turnStatus.endsToday && turnStatus.isMyTurn) {
     return {
@@ -70,28 +84,22 @@ const getMotorNotificationText = (
     };
   }
 
-  if (turnStatus.isMyTurn && turnStatus.daysRemaining > 1) {
+  if (turnStatus.isMyTurn) {
+    const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
     return {
       title: L(`🚰 ${farmName} - Your Turn is Active`, `🚰 ${farmName} - உங்கள் முறை தொடர்கிறது`),
-      body: L(
-        `Your shared motor turn is currently active. ${turnStatus.daysRemaining} days remaining.`,
-        `உங்கள் பகிர்வு மோட்டார் முறை தொடர்கிறது. ${turnStatus.daysRemaining} நாள் மீதம் உள்ளது.`
-      ),
+      body: L(`Your shared motor turn is active until ${endStr}.`, `உங்கள் முறை ${endStr} வரை தொடரும்.`),
       urgent: false,
     };
   }
 
-  if (!turnStatus.isMyTurn) {
-    return {
-      title: L(`💧 ${farmName} - ${turnStatus.ownerName}'s Turn`, `💧 ${farmName} - ${turnStatus.ownerName} முறை`),
-      body: L(`Today is ${turnStatus.ownerName}'s motor turn.`, `இன்று ${turnStatus.ownerName} மோட்டார் முறை.`),
-      urgent: false,
-    };
-  }
-
+  const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
   return {
-    title: L(`🚰 ${farmName} - Motor Turn`, `🚰 ${farmName} - மோட்டார் முறை`),
-    body: "",
+    title: L(`💧 ${farmName} - ${turnStatus.ownerName}'s Turn`, `💧 ${farmName} - ${turnStatus.ownerName} முறை`),
+    body: L(
+      `${turnStatus.ownerName}'s motor turn is active. Your next turn begins ${myNextStr}.`,
+      `${turnStatus.ownerName} மோட்டார் முறை தொடர்கிறது. உங்கள் அடுத்த முறை ${myNextStr} தொடங்கும்.`
+    ),
     urgent: false,
   };
 };
@@ -202,40 +210,36 @@ export default function MotorTurnNotifier() {
 
         const farmName = getFarmName(motor.farms as FarmRef);
 
-        // 6 PM - turn starts right now. This is its own distinct moment
-        // (not covered by getMotorNotificationText's ends-today/tomorrow/
-        // active stages), so it keeps its own dedicated message.
-        if (turnStatus.isMyTurn && hour === 18) {
-          const tag = `motor-start-${motor.id}-${today}`;
+        // 6 PM - turn starts right now. justStarted guards against firing
+        // for a turn that was already mid-way through before this check
+        // ran (e.g. clock skew) — only a turn that genuinely just began
+        // (within the last 12 hours) counts as "starting now".
+        if (hour === 18 && turnStatus.isMyTurn && turnStatus.justStarted) {
+          const { title, body } = getMotorNotificationText(turnStatus, farmName, lang);
+          await sendNotification(title, body, `motor-start-${motor.id}-${today}`, "/land-details", true);
+        }
+
+        // 6 PM - a NEIGHBOR's turn starts right now, so the farmer knows
+        // watering isn't theirs today and exactly when it will be again.
+        if (hour === 18 && !turnStatus.isMyTurn && turnStatus.justStarted) {
+          const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
           await sendNotification(
-            lang === "ta" ? `🚰 ${farmName} - உங்கள் முறை இப்போது தொடங்கியது!` : `🚰 ${farmName} - Your Turn Starts Now!`,
+            lang === "ta" ? `💧 ${farmName} - ${turnStatus.ownerName} முறை தொடங்கியது` : `💧 ${farmName} - ${turnStatus.ownerName}'s Turn Started`,
             lang === "ta"
-              ? "உங்கள் பகிர்வு மோட்டார் முறை இன்று மாலை 6:00 மணிக்கு தொடங்கியது. இப்போதே பாசனம் செய்யலாம்."
-              : "Your shared motor turn starts today at 6:00 PM. You can begin watering now.",
-            tag,
+              ? `${turnStatus.ownerName} மோட்டார் முறை தொடங்கியது. உங்கள் அடுத்த முறை ${myNextStr} தொடங்கும்.`
+              : `${turnStatus.ownerName}'s motor turn has started. Your next turn begins ${myNextStr}.`,
+            `motor-neighbor-${motor.id}-${today}`,
             "/land-details",
-            true
+            false
           );
         }
 
-        // 7 AM - morning reminder, staged by how many days are left in the
-        // turn so it reads differently on the last day vs. day one.
-        if (turnStatus.isMyTurn && hour === 7) {
-          const tag = `motor-morning-${motor.id}-${today}`;
-          if (turnStatus.endsToday) {
-            await sendNotification(
-              lang === "ta" ? `⏰ ${farmName} - உங்கள் முறையின் கடைசி நாள்` : `⏰ ${farmName} - Last Day of Your Turn`,
-              lang === "ta"
-                ? "உங்கள் பகிர்வு மோட்டார் முறை இன்று மாலை 6:00 மணிக்கு முடியும். பாசனத்தை முடித்துவிடுங்கள்."
-                : "Your shared motor turn ends today at 6:00 PM. Make sure to complete your watering.",
-              tag,
-              "/land-details",
-              false
-            );
-          } else {
-            const { title, body } = getMotorNotificationText(turnStatus, farmName, lang);
-            await sendNotification(title, body, tag, "/land-details", false);
-          }
+        // Morning reminder — widened to a 6-9 AM window (matching
+        // checkTodaysTurn's own window below) rather than exactly 7 AM, so
+        // it still lands if the app wasn't opened at the exact hour.
+        if (hour >= 6 && hour <= 9 && turnStatus.isMyTurn) {
+          const { title, body } = getMotorNotificationText(turnStatus, farmName, lang);
+          await sendNotification(title, body, `motor-morning-${motor.id}-${today}`, "/land-details", false);
         }
 
         // 5 PM - 1 hour warning
@@ -249,48 +253,6 @@ export default function MotorTurnNotifier() {
             tag,
             "/land-details",
             true
-          );
-        }
-      }
-    };
-
-    // Turn hand-off happens at 6 PM, not midnight — calculateCurrentTurn walks
-    // the rotation using the real current time, mirroring MotorSharingSection.
-    const checkTodaysTurn = async (lang: string) => {
-      const { data: motorData } = await supabase
-        .from("motor_sharing")
-        .select("*, motor_sharing_neighbors(*), farms(name, name_tamil)")
-        .eq("is_shared", true);
-
-      if (!motorData) return;
-
-      const todayStr = new Date().toDateString();
-
-      for (const motor of motorData) {
-        if (!motor.current_turn_start) continue;
-
-        const partnersList = (motor.motor_sharing_neighbors || []).map((n: { neighbor_name: string; turn_days: number }) => ({
-          name: n.neighbor_name,
-          days: Number(n.turn_days) || 2,
-        }));
-
-        const turnStatus = calculateCurrentTurn(
-          motor.current_turn_start,
-          motor.current_turn_owner,
-          Number(motor.current_turn_days) || 2,
-          partnersList
-        );
-
-        if (turnStatus?.isMyTurn) {
-          const farmName = lang === "ta" && motor.farms?.name_tamil ? motor.farms.name_tamil : motor.farms?.name || "Farm";
-          const tag = `motor-today-${motor.id}-${todayStr}`;
-
-          await sendNotification(
-            lang === "ta" ? `🚰 ${farmName} - இன்று உங்கள் முறை!` : `🚰 ${farmName} - Today is your motor turn!`,
-            lang === "ta" ? "இப்போதே தண்ணீர் பாசனம் செய்யலாம்" : "You can water your fields now",
-            tag,
-            "/land-details",
-            false
           );
         }
       }
@@ -329,11 +291,9 @@ export default function MotorTurnNotifier() {
 
       try {
         await checkTractorOil(lang);
+        // checkMotorTurns already covers the 6-9 AM morning reminder (with
+        // richer, context-aware text) — no separate "today's turn" check needed.
         await checkMotorTurns(lang, hour, today);
-        // Check today's motor turn (morning only)
-        if (hour >= 6 && hour <= 9) {
-          await checkTodaysTurn(lang);
-        }
         if (now.getDay() === 3) {
           await checkMilkPayments(lang);
         }
