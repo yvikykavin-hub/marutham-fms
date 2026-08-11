@@ -92,6 +92,19 @@ const EXPENSE_KEYWORDS = [
   "ஊசி", "டாக்டர்", "கூலி", "ஆள்",
 ];
 
+export const INCOME_KEYWORDS = [
+  // English
+  "income", "sold", "sale", "sell",
+  "received", "earned", "got money",
+  "sold goat", "sold hen", "sold chicken",
+  "buyer", "market", "profit",
+  // Tamil
+  "விற்றோம்", "விற்பனை", "வருமானம்",
+  "வந்தது", "கிடைத்தது", "பணம் வந்தது",
+  "ஆடு விற்றோம்", "கோழி விற்றோம்",
+  "வாங்கினார்", "சந்தை",
+];
+
 const ANIMAL_KEYWORDS: Record<string, string[]> = {
   cow: [
     "cow", "cows", "cattle",
@@ -334,13 +347,21 @@ export function extractNumbers(text: string): number[] {
 // ================================
 
 export interface KeywordResult {
-  module: "milk_collection" | "livestock_expense" | "unknown";
+  module: "milk_collection" | "livestock_expense" | "livestock_income" | "unknown";
   animal_type: string;
   date: string;
   morning_litres?: number;
   evening_litres?: number;
   amount?: number;
   category?: string;
+  // Income fields (livestock_income only)
+  sale_type?: "weight" | "bird";
+  weight_kg?: number;
+  rate_per_kg?: number;
+  number_sold?: number;
+  rate_per_bird?: number;
+  total_amount?: number;
+  buyer_name?: string;
   confidence: number;
   missing: string[];
 }
@@ -359,17 +380,32 @@ export function processKeywords(transcript: string): KeywordResult {
   let moduleType: KeywordResult["module"] = "unknown";
 
   const hasMilk = MILK_KEYWORDS.some((k) => text.includes(k.toLowerCase()));
+  const hasIncome = INCOME_KEYWORDS.some((k) => text.includes(k.toLowerCase()));
   const hasExpense = EXPENSE_KEYWORDS.some((k) => text.includes(k.toLowerCase()));
 
-  if (hasMilk && !hasExpense) {
+  // Priority order:
+  // 1. Milk → milk_collection
+  // 2. Income words → livestock_income (checked before expense so a sale
+  //    utterance like "sold goat feed for money" doesn't get misclassified)
+  // 3. Expense words → livestock_expense
+  // 4. Unknown
+  if (hasMilk && !hasIncome) {
     moduleType = "milk_collection";
     confidence += 30;
-  } else if (hasExpense && !hasMilk) {
+  } else if (hasIncome && !hasExpense) {
+    moduleType = "livestock_income";
+    confidence += 30;
+  } else if (hasExpense && !hasIncome) {
     moduleType = "livestock_expense";
     confidence += 30;
-  } else if (hasMilk && hasExpense) {
-    // Both found - milk takes priority if litre mentioned
-    moduleType = text.includes("litre") || text.includes("லிட்டர்") ? "milk_collection" : "livestock_expense";
+  } else if (hasMilk) {
+    moduleType = "milk_collection";
+    confidence += 20;
+  } else if (hasIncome) {
+    moduleType = "livestock_income";
+    confidence += 20;
+  } else if (hasExpense) {
+    moduleType = "livestock_expense";
     confidence += 20;
   } else {
     missing.push("module");
@@ -504,6 +540,58 @@ export function processKeywords(transcript: string): KeywordResult {
     // returns a sensible per-animal default (normal_feed / feed).
   }
 
+  // ── Detect Income (Goat/Hen sale) ──
+  // Goat sales are always by weight; hen sales are by weight OR by bird
+  // count — mirrors the goat_income / hen_income table schemas.
+  let sale_type: "weight" | "bird" | undefined;
+  let weight_kg: number | undefined;
+  let rate_per_kg: number | undefined;
+  let number_sold: number | undefined;
+  let rate_per_bird: number | undefined;
+  let total_amount: number | undefined;
+  let buyer_name: string | undefined;
+
+  if (moduleType === "livestock_income") {
+    const byWeight = ["kg", "kilo", "weight", "கிலோ", "எடை", "கிலோகிராம்"].some((k) => text.includes(k));
+    const byBird = ["bird", "hen", "chicken", "கோழி", "பறவை", "மனித"].some((k) => text.includes(k)) && !byWeight;
+
+    if (byWeight || animal_type === "goat") {
+      sale_type = "weight";
+      if (numbers.length >= 2) {
+        // Rate per kg is typically the larger number for livestock (e.g. a
+        // 25kg goat at ₹300/kg — weight is the smaller figure, rate the
+        // larger one), so the smallest number is weight, the largest is rate.
+        const sortedNums = [...numbers].sort((a, b) => a - b);
+        weight_kg = sortedNums[0];
+        rate_per_kg = sortedNums[sortedNums.length - 1];
+        confidence += 20;
+      } else if (numbers.length === 1) {
+        total_amount = numbers[0];
+        confidence += 10;
+      }
+    }
+
+    if (byBird && animal_type === "hen") {
+      sale_type = "bird";
+      if (numbers.length >= 2) {
+        number_sold = Math.round(numbers[0]);
+        rate_per_bird = numbers[1];
+        confidence += 20;
+      }
+    }
+
+    // Extract buyer name (after "to" / "buyer" / "வாங்கினார்")
+    const buyerMatch = transcript.match(/(?:to|buyer|வாங்கினார்)\s+([A-Za-z஀-௿]+)/i);
+    if (buyerMatch) {
+      buyer_name = buyerMatch[1];
+      confidence += 5;
+    }
+
+    if (weight_kg === undefined && number_sold === undefined && total_amount === undefined) {
+      missing.push("amount");
+    }
+  }
+
   return {
     module: moduleType,
     animal_type,
@@ -512,6 +600,13 @@ export function processKeywords(transcript: string): KeywordResult {
     evening_litres,
     amount,
     category,
+    sale_type,
+    weight_kg,
+    rate_per_kg,
+    number_sold,
+    rate_per_bird,
+    total_amount,
+    buyer_name,
     confidence,
     missing,
   };

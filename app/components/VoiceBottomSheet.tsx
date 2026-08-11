@@ -19,12 +19,40 @@ interface FormData {
   module: string;
   animal_type: string;
   date: string;
+  // milk fields
   morning_litres: number;
   evening_litres: number;
+  // expense fields
   amount: number;
   category: string;
   description: string;
+  // income fields
+  sale_type: "weight" | "bird";
+  weight_kg: number;
+  rate_per_kg: number;
+  number_sold: number;
+  rate_per_bird: number;
+  total_amount: number;
+  buyer_name: string;
 }
+
+// Spread into every setFormData call outside the income branch so
+// FormData's (required) income fields always have a sane, empty default.
+const EMPTY_INCOME_FIELDS = {
+  sale_type: "weight" as const,
+  weight_kg: 0,
+  rate_per_kg: 0,
+  number_sold: 0,
+  rate_per_bird: 0,
+  total_amount: 0,
+  buyer_name: "",
+};
+
+const incomeTotal = (r: { sale_type?: "weight" | "bird"; weight_kg?: number; rate_per_kg?: number; number_sold?: number; rate_per_bird?: number; total_amount?: number }) => {
+  if (r.total_amount) return r.total_amount;
+  if (r.sale_type === "bird") return (r.number_sold || 0) * (r.rate_per_bird || 0);
+  return (r.weight_kg || 0) * (r.rate_per_kg || 0);
+};
 
 type AnimalOption = { id: string; name: string };
 
@@ -139,14 +167,14 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
     }
   }, [isOpen, stopListening, resetState]);
 
-  // Goat/hen expenses require a specific animal record (goat_id / hen_id) —
-  // there's no farm-wide expense table for them the way cow_expenses covers
-  // both cow and buffalo, so fetch the farm's animals of that type whenever
-  // the form data points at one.
+  // Goat/hen expenses AND income both require a specific animal record
+  // (goat_id / hen_id) — there's no farm-wide table for them the way
+  // cow_expenses covers both cow and buffalo, so fetch the farm's animals
+  // of that type whenever the form data points at one.
   useEffect(() => {
     const needsAnimalPick =
       voiceState === "confirm" &&
-      formData?.module === "livestock_expense" &&
+      (formData?.module === "livestock_expense" || formData?.module === "livestock_income") &&
       (formData?.animal_type === "goat" || formData?.animal_type === "hen");
 
     if (!needsAnimalPick) {
@@ -178,6 +206,31 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
     const keywordResult = processKeywords(text);
 
     if (keywordResult.confidence >= 70 && keywordResult.module !== "unknown") {
+      if (keywordResult.module === "livestock_income") {
+        // Income only applies to goat/hen — the animal detector's generic
+        // cow default is meaningless here, so normalize it to goat.
+        const incomeAnimal = keywordResult.animal_type === "hen" ? "hen" : "goat";
+        setFormData({
+          module: "livestock_income",
+          animal_type: incomeAnimal,
+          date: keywordResult.date,
+          morning_litres: 0,
+          evening_litres: 0,
+          amount: 0,
+          category: "",
+          description: "",
+          sale_type: keywordResult.sale_type || "weight",
+          weight_kg: keywordResult.weight_kg || 0,
+          rate_per_kg: keywordResult.rate_per_kg || 0,
+          number_sold: keywordResult.number_sold || 0,
+          rate_per_bird: keywordResult.rate_per_bird || 0,
+          total_amount: incomeTotal(keywordResult),
+          buyer_name: keywordResult.buyer_name || "",
+        });
+        setVoiceState("confirm");
+        return;
+      }
+
       setFormData({
         module: keywordResult.module,
         animal_type: keywordResult.animal_type,
@@ -187,6 +240,7 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
         amount: keywordResult.amount || 0,
         category: keywordResult.category || defaultCategoryFor(keywordResult.animal_type),
         description: "",
+        ...EMPTY_INCOME_FIELDS,
       });
       setVoiceState("confirm");
       return;
@@ -204,6 +258,38 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
 
       if (data.success && data.result) {
         const r = data.result;
+
+        if (r.module === "livestock_income") {
+          const incomeAnimal = r.animal_type === "hen" ? "hen" : "goat";
+          const saleType: "weight" | "bird" = r.sale_type === "bird" ? "bird" : "weight";
+          setFormData({
+            module: "livestock_income",
+            animal_type: incomeAnimal,
+            date: r.date || today,
+            morning_litres: 0,
+            evening_litres: 0,
+            amount: 0,
+            category: "",
+            description: "",
+            sale_type: saleType,
+            weight_kg: Number(r.weight_kg) || 0,
+            rate_per_kg: Number(r.rate_per_kg) || 0,
+            number_sold: Number(r.number_sold) || 0,
+            rate_per_bird: Number(r.rate_per_bird) || 0,
+            total_amount: incomeTotal({
+              sale_type: saleType,
+              weight_kg: Number(r.weight_kg) || 0,
+              rate_per_kg: Number(r.rate_per_kg) || 0,
+              number_sold: Number(r.number_sold) || 0,
+              rate_per_bird: Number(r.rate_per_bird) || 0,
+              total_amount: Number(r.total_amount) || 0,
+            }),
+            buyer_name: r.buyer_name || "",
+          });
+          setVoiceState("confirm");
+          return;
+        }
+
         const resolvedAnimal = r.animal_type || "cow";
         // Gemini is asked to return an exact category key, but LLM output
         // isn't guaranteed — fall back to the keyword detector (over this
@@ -219,6 +305,7 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
           amount: Number(r.amount) || 0,
           category: resolvedCategory,
           description: r.description || "",
+          ...EMPTY_INCOME_FIELDS,
         });
         setVoiceState("confirm");
       } else {
@@ -231,6 +318,7 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
           amount: 0,
           category: defaultCategoryFor("cow"),
           description: "",
+          ...EMPTY_INCOME_FIELDS,
         });
         setVoiceState("confirm");
         toast(L("Couldn't understand fully. Please fill in the details.", "முழுமையாக புரியவில்லை. விவரங்களை நிரப்பவும்."));
@@ -245,6 +333,7 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
         amount: 0,
         category: defaultCategoryFor("cow"),
         description: "",
+        ...EMPTY_INCOME_FIELDS,
       });
       setVoiceState("confirm");
     }
@@ -368,7 +457,7 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
     if (!formData) return;
 
     if (
-      formData.module === "livestock_expense" &&
+      (formData.module === "livestock_expense" || formData.module === "livestock_income") &&
       (formData.animal_type === "goat" || formData.animal_type === "hen") &&
       !selectedAnimalId
     ) {
@@ -386,6 +475,8 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
     try {
       if (formData.module === "milk_collection") {
         await saveMilkCollection();
+      } else if (formData.module === "livestock_income") {
+        await saveLivestockIncome();
       } else {
         await saveLivestockExpense();
       }
@@ -528,6 +619,51 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
     toast.success(L("✅ Expense saved!", "✅ செலவு சேமிக்கப்பட்டது!"));
   };
 
+  const saveLivestockIncome = async () => {
+    if (!formData) return;
+    const amount = Number(formData.total_amount) || 0;
+    const buyerName = formData.buyer_name.trim() || null;
+
+    // goat_income/hen_income both key off a specific animal (goat_id/hen_id
+    // is NOT NULL) — same as the manual "Add Sale" forms on the Goats/Hens
+    // pages, selectedAnimalId is required and validated before this runs.
+    if (formData.animal_type === "goat") {
+      const { error } = await supabase.from("goat_income").insert({
+        goat_id: selectedAnimalId,
+        farm_location: "Home",
+        sale_date: formData.date,
+        weight_kg: formData.weight_kg || null,
+        rate_per_kg: formData.rate_per_kg || null,
+        total_amount: amount,
+        buyer_name: buyerName,
+        remarks: "Voice entry",
+      });
+      if (error) throw error;
+    } else {
+      const isBird = formData.sale_type === "bird";
+      const { error } = await supabase.from("hen_income").insert({
+        hen_id: selectedAnimalId,
+        farm_location: "Home",
+        sale_date: formData.date,
+        sale_type: formData.sale_type,
+        weight_kg: !isBird ? formData.weight_kg || null : null,
+        rate_per_kg: !isBird ? formData.rate_per_kg || null : null,
+        number_sold: isBird ? formData.number_sold || null : null,
+        rate_per_bird: isBird ? formData.rate_per_bird || null : null,
+        total_amount: amount,
+        buyer_name: buyerName,
+        remarks: "Voice entry",
+      });
+      if (error) throw error;
+    }
+
+    await ActivityLog.added(
+      formData.animal_type === "goat" ? "Goat Income" : "Hen Income",
+      `Voice: ${formData.animal_type} sold ₹${amount}`
+    );
+    toast.success(L("✅ Income saved!", "✅ வருமானம் சேமிக்கப்பட்டது!"));
+  };
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -614,14 +750,14 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
                           ? [
                               '"இன்று பசு காலை நாலரை மாலை மூணு லிட்டர்"',
                               '"நேத்து மாட்டுக்கு தீவனம் 500 ரூபாய்"',
-                              '"இன்று ஆட்டுக்கு மருந்து 200 ரூபாய்"',
-                              '"இன்று கோழிக்கு தீவனம் 150 ரூபாய்"',
+                              '"இன்று ஆடு விற்றோம் 25 கிலோ 300 ரூபாய்"',
+                              '"இன்று கோழி விற்றோம் 10 கோழி 150 ரூபாய்"',
                             ]
                           : [
                               '"Today cow milk morning 4.5 evening 3 litres"',
                               '"Spent 500 on cattle feed today"',
-                              '"Goat medicine 200 rupees yesterday"',
-                              '"Hen feed 150 rupees today"',
+                              '"Sold goat today 25kg at 300 per kg"',
+                              '"Sold 10 hens today at 150 per bird"',
                             ]
                         ).map((ex, i) => (
                           <p key={i} className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -715,11 +851,23 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
                         {[
                           { key: "milk_collection", icon: "🥛", en: "Milk", ta: "பால்" },
                           { key: "livestock_expense", icon: "💰", en: "Expense", ta: "செலவு" },
+                          { key: "livestock_income", icon: "💵", en: "Income", ta: "வருமானம்" },
                         ].map((opt) => (
                           <button
                             key={opt.key}
-                            onClick={() => setFormData({ ...formData, module: opt.key })}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all ${
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                module: opt.key,
+                                // Income only supports goat/hen — reset off cow/buffalo
+                                // so the (now-hidden) selector never leaves an invalid pick.
+                                animal_type:
+                                  opt.key === "livestock_income" && formData.animal_type !== "goat" && formData.animal_type !== "hen"
+                                    ? "goat"
+                                    : formData.animal_type,
+                              })
+                            }
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
                               formData.module === opt.key ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400"
                             }`}
                           >
@@ -730,41 +878,44 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
                       </div>
                     </div>
 
-                    {/* Animal */}
-                    <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Animal", "கால்நடை")}</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { key: "cow", icon: "🐄", en: "Cow", ta: "பசு" },
-                          { key: "buffalo", icon: "🐃", en: "Buffalo", ta: "எருமை" },
-                          { key: "goat", icon: "🐐", en: "Goat", ta: "ஆடு" },
-                          { key: "hen", icon: "🐓", en: "Hen", ta: "கோழி" },
-                        ].map((a) => (
-                          <button
-                            key={a.key}
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                animal_type: a.key,
-                                // The previous category key may not exist for the newly
-                                // picked animal's subcategory set — reseed it so a stale
-                                // selection never gets silently saved.
-                                category: defaultCategoryFor(a.key),
-                              })
-                            }
-                            className={`py-2 rounded-xl text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                              formData.animal_type === a.key ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400"
-                            }`}
-                          >
-                            <span>{a.icon}</span>
-                            <span>{L(a.en, a.ta)}</span>
-                          </button>
-                        ))}
+                    {/* Animal — income has its own goat/hen-only picker below */}
+                    {formData.module !== "livestock_income" && (
+                      <div>
+                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Animal", "கால்நடை")}</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { key: "cow", icon: "🐄", en: "Cow", ta: "பசு" },
+                            { key: "buffalo", icon: "🐃", en: "Buffalo", ta: "எருமை" },
+                            { key: "goat", icon: "🐐", en: "Goat", ta: "ஆடு" },
+                            { key: "hen", icon: "🐓", en: "Hen", ta: "கோழி" },
+                          ].map((a) => (
+                            <button
+                              key={a.key}
+                              onClick={() =>
+                                setFormData({
+                                  ...formData,
+                                  animal_type: a.key,
+                                  // The previous category key may not exist for the newly
+                                  // picked animal's subcategory set — reseed it so a stale
+                                  // selection never gets silently saved.
+                                  category: defaultCategoryFor(a.key),
+                                })
+                              }
+                              className={`py-2 rounded-xl text-xs font-medium flex flex-col items-center gap-1 transition-all ${
+                                formData.animal_type === a.key ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400"
+                              }`}
+                            >
+                              <span>{a.icon}</span>
+                              <span>{L(a.en, a.ta)}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Specific goat/hen picker — required since goat_expenses/hen_expenses
-                        key off a specific animal, unlike the shared cow_expenses table. */}
+                        key off a specific animal, unlike the shared cow_expenses table.
+                        (Income has its own equivalent picker further below.) */}
                     {formData.module === "livestock_expense" && (formData.animal_type === "goat" || formData.animal_type === "hen") && (
                       <div>
                         <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
@@ -793,17 +944,19 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
                       </div>
                     )}
 
-                    {/* Date */}
-                    <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Date", "தேதி")}</label>
-                      <input
-                        type="date"
-                        value={formData.date}
-                        max={today}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                    </div>
+                    {/* Date — income has its own Date field below */}
+                    {formData.module !== "livestock_income" && (
+                      <div>
+                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Date", "தேதி")}</label>
+                        <input
+                          type="date"
+                          value={formData.date}
+                          max={today}
+                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    )}
 
                     {/* Milk fields */}
                     {formData.module === "milk_collection" && (
@@ -881,6 +1034,206 @@ export default function VoiceBottomSheet({ isOpen, onClose, language }: VoiceBot
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             placeholder={L("Optional details", "கூடுதல் விவரம்")}
+                            className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Income fields */}
+                    {formData.module === "livestock_income" && (
+                      <div className="space-y-3">
+                        {/* Animal - only goat/hen for income */}
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Animal", "கால்நடை")}</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { key: "goat", icon: "🐐", en: "Goat", ta: "ஆடு" },
+                              { key: "hen", icon: "🐓", en: "Hen", ta: "கோழி" },
+                            ].map((a) => (
+                              <button
+                                key={a.key}
+                                onClick={() => setFormData({ ...formData, animal_type: a.key, sale_type: "weight" })}
+                                className={`py-2 rounded-xl text-xs font-medium flex flex-col items-center gap-1 transition-all active:scale-95 ${
+                                  formData.animal_type === a.key ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400"
+                                }`}
+                              >
+                                <span>{a.icon}</span>
+                                <span>{L(a.en, a.ta)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Which specific goat/hen — required since goat_income/hen_income
+                            key off a specific animal record. */}
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
+                            {formData.animal_type === "goat" ? L("Which goat?", "எந்த ஆடு?") : L("Which hen?", "எந்த கோழி?")}
+                          </label>
+                          {animalOptions.length > 0 ? (
+                            <select
+                              value={selectedAnimalId}
+                              onChange={(e) => setSelectedAnimalId(e.target.value)}
+                              className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                            >
+                              {animalOptions.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-xs text-danger">
+                              {L(
+                                `No active ${formData.animal_type}s found. Add one from the ${formData.animal_type === "goat" ? "Goats" : "Hens"} page first.`,
+                                "செயலில் உள்ள கால்நடை இல்லை. முதலில் சேர்க்கவும்."
+                              )}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Date */}
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Date", "தேதி")}</label>
+                          <input
+                            type="date"
+                            value={formData.date}
+                            max={today}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+
+                        {/* Sale type toggle - only for hen */}
+                        {formData.animal_type === "hen" && (
+                          <div>
+                            <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{L("Sale Type", "விற்பனை வகை")}</label>
+                            <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
+                              <button
+                                onClick={() => setFormData({ ...formData, sale_type: "weight" })}
+                                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                                  formData.sale_type === "weight"
+                                    ? "bg-white dark:bg-slate-600 text-green-700 dark:text-green-400 shadow-sm"
+                                    : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                ⚖️ {L("By Weight", "எடையில்")}
+                              </button>
+                              <button
+                                onClick={() => setFormData({ ...formData, sale_type: "bird" })}
+                                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                                  formData.sale_type === "bird"
+                                    ? "bg-white dark:bg-slate-600 text-green-700 dark:text-green-400 shadow-sm"
+                                    : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                🐓 {L("Per Bird", "ஒவ்வொரு கோழி")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Weight based fields */}
+                        {(formData.animal_type === "goat" || formData.sale_type === "weight") && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">⚖️ {L("Weight (kg)", "எடை (கி)")}</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={formData.weight_kg}
+                                onChange={(e) => {
+                                  const w = Number(e.target.value);
+                                  setFormData({ ...formData, weight_kg: w, total_amount: w * formData.rate_per_kg });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "-") e.preventDefault();
+                                }}
+                                className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">💰 {L("Rate/kg (₹)", "விலை/கி (₹)")}</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={formData.rate_per_kg}
+                                onChange={(e) => {
+                                  const r = Number(e.target.value);
+                                  setFormData({ ...formData, rate_per_kg: r, total_amount: formData.weight_kg * r });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "-") e.preventDefault();
+                                }}
+                                className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bird based fields */}
+                        {formData.animal_type === "hen" && formData.sale_type === "bird" && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">🐓 {L("No. of Birds", "கோழி எண்")}</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={formData.number_sold}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value);
+                                  setFormData({ ...formData, number_sold: n, total_amount: n * formData.rate_per_bird });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "-") e.preventDefault();
+                                }}
+                                className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">💰 {L("Rate/Bird (₹)", "விலை/கோழி (₹)")}</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={formData.rate_per_bird}
+                                onChange={(e) => {
+                                  const r = Number(e.target.value);
+                                  setFormData({ ...formData, rate_per_bird: r, total_amount: formData.number_sold * r });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "-") e.preventDefault();
+                                }}
+                                className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Total amount */}
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">💵 {L("Total Amount (₹)", "மொத்த தொகை (₹)")}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={formData.total_amount}
+                            onChange={(e) => setFormData({ ...formData, total_amount: Number(e.target.value) })}
+                            onKeyDown={(e) => {
+                              if (e.key === "-") e.preventDefault();
+                            }}
+                            className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+
+                        {/* Buyer name */}
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">👤 {L("Buyer Name (optional)", "வாங்கியவர் பெயர் (விருப்பம்)")}</label>
+                          <input
+                            type="text"
+                            value={formData.buyer_name}
+                            onChange={(e) => setFormData({ ...formData, buyer_name: e.target.value })}
+                            placeholder={L("Enter buyer name", "வாங்கியவர் பெயர்")}
                             className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         </div>

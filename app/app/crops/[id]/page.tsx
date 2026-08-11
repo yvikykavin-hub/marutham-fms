@@ -80,14 +80,6 @@ type ExpenseRecord = {
   created_at?: string;
 };
 
-type IrrigationRecord = {
-  id: string;
-  irrigation_date: string;
-  method: string;
-  duration_hours: number;
-  notes: string | null;
-};
-
 type HarvestRecord = {
   id: string;
   harvest_date: string;
@@ -864,14 +856,6 @@ export default function CropDetail() {
   const [weedNotes, setWeedNotes] = useState("");
   const [savingWeed, setSavingWeed] = useState(false);
 
-  // Activities - irrigation
-  const [irrigationRecords, setIrrigationRecords] = useState<IrrigationRecord[]>([]);
-  const [irrigationDate, setIrrigationDate] = useState("");
-  const [irrigationMethod, setIrrigationMethod] = useState("Drip");
-  const [irrigationDuration, setIrrigationDuration] = useState("");
-  const [irrigationNotes, setIrrigationNotes] = useState("");
-  const [savingIrrigation, setSavingIrrigation] = useState(false);
-
   useEffect(() => {
     if (id) {
       fetchCultivation();
@@ -880,7 +864,6 @@ export default function CropDetail() {
       fetchHarvestRecords();
       fetchFertilizerRecords();
       fetchWeedRecords();
-      fetchIrrigationRecords();
     }
   }, [id]);
 
@@ -1116,15 +1099,6 @@ export default function CropDetail() {
       .eq("cultivation_id", id)
       .order("start_date", { ascending: false });
     if (!error && data) setWeedRecords(data);
-  };
-
-  const fetchIrrigationRecords = async () => {
-    const { data, error } = await supabase
-      .from("irrigation_records")
-      .select("*")
-      .eq("cultivation_id", id)
-      .order("irrigation_date", { ascending: false });
-    if (!error && data) setIrrigationRecords(data);
   };
 
   const reportError = (label: string, message: string) => toast.error(`${label}: ${message}`);
@@ -2070,34 +2044,6 @@ export default function CropDetail() {
     setSavingWeed(false);
   };
 
-  // ---- Irrigation ----
-  const saveIrrigation = async () => {
-    if (!irrigationDate || !irrigationDuration) {
-      toast.error(L("Date and duration are required", "தேதி மற்றும் கால அளவு தேவை"));
-      return;
-    }
-    setSavingIrrigation(true);
-    try {
-      const { error } = await supabase.from("irrigation_records").insert({
-        cultivation_id: id,
-        irrigation_date: irrigationDate,
-        method: irrigationMethod,
-        duration_hours: parseFloat(irrigationDuration) || 0,
-        notes: irrigationNotes.trim() || null,
-      });
-      if (error) reportError("Error saving irrigation record", error.message);
-      else {
-        setIrrigationDate("");
-        setIrrigationDuration("");
-        setIrrigationNotes("");
-        fetchIrrigationRecords();
-      }
-    } catch (err) {
-      reportError("Unexpected error", err instanceof Error ? err.message : String(err));
-    }
-    setSavingIrrigation(false);
-  };
-
   // ---- Generic turmeric activity engine ----
   const setActivityValue = (key: string, field: string, value: string) => {
     setFormValues((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [field]: value } }));
@@ -2132,6 +2078,54 @@ export default function CropDetail() {
     } catch (err) {
       reportError("Unexpected error", err instanceof Error ? err.message : String(err));
     }
+    });
+  };
+
+  const deleteHarvestRecord = (recordId: string) => {
+    const target = harvestRecords.find((r) => r.id === recordId);
+    confirmDelete(async () => {
+      try {
+        const { error } = await supabase.from("harvest_records").delete().eq("id", recordId);
+        if (error) reportError("Error deleting record", error.message);
+        else {
+          await ActivityLog.deleted("Crop", `Harvest record deleted: ${target?.yield_quantity ?? 0}${target?.yield_unit ?? ""}`);
+          fetchHarvestRecords();
+        }
+      } catch (err) {
+        reportError("Unexpected error", err instanceof Error ? err.message : String(err));
+      }
+    });
+  };
+
+  const deleteFertilizerRecord = (recordId: string) => {
+    const target = fertilizerRecords.find((r) => r.id === recordId);
+    confirmDelete(async () => {
+      try {
+        const { error } = await supabase.from("fertilizer_applications").delete().eq("id", recordId);
+        if (error) reportError("Error deleting record", error.message);
+        else {
+          await ActivityLog.deleted("Crop", `Fertilizer application deleted: ₹${target?.cost ?? 0}`);
+          fetchFertilizerRecords();
+        }
+      } catch (err) {
+        reportError("Unexpected error", err instanceof Error ? err.message : String(err));
+      }
+    });
+  };
+
+  const deleteWeedRecord = (recordId: string) => {
+    const target = weedRecords.find((r) => r.id === recordId);
+    confirmDelete(async () => {
+      try {
+        const { error } = await supabase.from("weed_removals").delete().eq("id", recordId);
+        if (error) reportError("Error deleting record", error.message);
+        else {
+          await ActivityLog.deleted("Crop", `Weed removal record deleted: ₹${target?.total_cost ?? 0}`);
+          fetchWeedRecords();
+        }
+      } catch (err) {
+        reportError("Unexpected error", err instanceof Error ? err.message : String(err));
+      }
     });
   };
 
@@ -3780,9 +3774,12 @@ export default function CropDetail() {
                     {expenseRecords.length > 0 && (
                       <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
                         {expenseRecords.map((r) => (
-                          <div key={r.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 py-1">
-                            <span>{r.expense_date} · {r.category} {r.vendor_name ? `· ${r.vendor_name}` : ""} {r.description ? `· ${r.description}` : ""}</span>
-                            <span className="font-semibold text-red-600">{inr(Number(r.amount))}</span>
+                          <div key={r.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 py-1">
+                            <span className="truncate">{r.expense_date} · {r.category} {r.vendor_name ? `· ${r.vendor_name}` : ""} {r.description ? `· ${r.description}` : ""}</span>
+                            <span className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-semibold text-red-600">{inr(Number(r.amount))}</span>
+                              <button onClick={() => deleteExpenseRecord(r.id)} className="hover:text-danger">🗑️</button>
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -3829,9 +3826,12 @@ export default function CropDetail() {
                   {harvestRecords.length > 0 && (
                     <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
                       {harvestRecords.map((r) => (
-                        <div key={r.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 py-1">
-                          <span>{r.harvest_date} {r.notes ? `· ${r.notes}` : ""}</span>
-                          <span className="font-semibold text-gray-800">{r.yield_quantity} {r.yield_unit}</span>
+                        <div key={r.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 py-1">
+                          <span className="truncate">{r.harvest_date} {r.notes ? `· ${r.notes}` : ""}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-semibold text-gray-800">{r.yield_quantity} {r.yield_unit}</span>
+                            <button onClick={() => deleteHarvestRecord(r.id)} className="hover:text-danger">🗑️</button>
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -4102,11 +4102,14 @@ export default function CropDetail() {
                 {fertilizerRecords.length > 0 && (
                   <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
                     {fertilizerRecords.map((r) => (
-                      <div key={r.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 py-1">
-                        <span>
+                      <div key={r.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 py-1">
+                        <span className="truncate">
                           {r.application_date} · {r.fertilizer_name} · {r.quantity}{r.unit} · M{r.crop_month} · {r.growth_stage}
                         </span>
-                        <span className="font-semibold text-gray-800">{inr(Number(r.cost))}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-semibold text-gray-800">{inr(Number(r.cost))}</span>
+                          <button onClick={() => deleteFertilizerRecord(r.id)} className="hover:text-danger">🗑️</button>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -4156,59 +4159,18 @@ export default function CropDetail() {
                 {weedRecords.length > 0 && (
                   <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
                     {weedRecords.map((r) => (
-                      <div key={r.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 py-1">
-                        <span>{r.start_date} → {r.end_date} · {r.total_days}d · {r.workers_per_day}w × ₹{r.cost_per_day}</span>
-                        <span className="font-semibold text-gray-800">{inr(Number(r.total_cost))}</span>
+                      <div key={r.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 py-1">
+                        <span className="truncate">{r.start_date} → {r.end_date} · {r.total_days}d · {r.workers_per_day}w × ₹{r.cost_per_day}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-semibold text-gray-800">{inr(Number(r.total_cost))}</span>
+                          <button onClick={() => deleteWeedRecord(r.id)} className="hover:text-danger">🗑️</button>
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Irrigation */}
-              <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3">
-                <h2 className="text-sm font-semibold text-gray-800 mb-2">💧 {L("Irrigation", "நீர்ப்பாசனம்")}</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                  <div>
-                    <label className={labelCls}>{L("Date", "தேதி")}</label>
-                    <input type="date" value={irrigationDate} onChange={(e) => setIrrigationDate(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>{L("Method", "முறை")}</label>
-                    <select value={irrigationMethod} onChange={(e) => setIrrigationMethod(e.target.value)} className={inputCls}>
-                      {["Drip", "Sprinkler", "Flood", "Manual"].map((m) => (
-                        <option className="text-gray-900" key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{L("Duration (hours)", "கால அளவு (மணி)")}</label>
-                    <input type="number" value={irrigationDuration} onChange={(e) => setIrrigationDuration(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>{L("Notes", "குறிப்பு")}</label>
-                    <input type="text" value={irrigationNotes} onChange={(e) => setIrrigationNotes(e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-                <button
-                  onClick={saveIrrigation}
-                  disabled={savingIrrigation}
-                  className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
-                >
-                  {savingIrrigation ? "..." : L("Add", "சேர்")}
-                </button>
-
-                {irrigationRecords.length > 0 && (
-                  <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
-                    {irrigationRecords.map((r) => (
-                      <div key={r.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 py-1">
-                        <span>{r.irrigation_date} · {r.method} {r.notes ? `· ${r.notes}` : ""}</span>
-                        <span className="font-semibold text-gray-800">{r.duration_hours}h</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
                 </>
               )}
 

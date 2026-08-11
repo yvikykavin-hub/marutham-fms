@@ -38,6 +38,11 @@ Time: இன்று/today=${today}, நேத்து/yesterday=${yesterday}
 Animal: பசு/மாடு=cow, எருமை=buffalo,
         ஆடு=goat, கோழி=hen
 
+SUPPORTED MODULES:
+1. milk_collection
+2. livestock_expense
+3. livestock_income
+
 EXPENSE CATEGORY — pick the category key based on animal_type.
 Return the EXACT category key from the matching list below, never
 a translated or made-up value.
@@ -58,19 +63,27 @@ feed, brownLeafRolls, medicine, vaccination, veterinary, other
 HEN EXPENSE TYPES:
 feed, medicine, vaccination, shedMaintenance, miscellaneous, other
 
+LIVESTOCK INCOME RULES:
+- Only goat and hen have sale income. Cow/buffalo have NO sale income —
+  their income is milk only, always use module milk_collection for them.
+- Goat income: weight(kg) × rate/kg = total. sale_type is always "weight".
+- Hen income: EITHER by weight(kg) × rate/kg OR by bird count × rate/bird.
+  Pick sale_type "weight" or "bird" based on what the speaker mentioned.
+- Keywords: sold, income, sale, விற்றோம், விற்பனை, வருமானம்
+
 RULES (VERY IMPORTANT):
 1. NEVER ask questions
 2. ALWAYS return JSON
 3. Use smart defaults:
    - Missing date → ${today}
-   - Missing animal → cow
+   - Missing animal → cow (or goat if module is livestock_income and unclear)
    - Missing amount → 0
    - Missing session → use 0
    - Missing/unclear category → normal_feed for cow/buffalo, feed for goat/hen
 4. Return your BEST GUESS always
 5. No markdown, no explanation
 
-RETURN FORMAT:
+RETURN FORMAT (milk_collection / livestock_expense):
 {
   "module": "milk_collection" OR "livestock_expense",
   "animal_type": "cow|buffalo|goat|hen",
@@ -80,6 +93,21 @@ RETURN FORMAT:
   "amount": 0,
   "category": "<exact key from the matching EXPENSE TYPES list above>",
   "description": "",
+  "confidence": 0.0-1.0
+}
+
+RETURN FORMAT (livestock_income):
+{
+  "module": "livestock_income",
+  "animal_type": "goat|hen",
+  "date": "YYYY-MM-DD",
+  "sale_type": "weight|bird",
+  "weight_kg": 0,
+  "rate_per_kg": 0,
+  "number_sold": 0,
+  "rate_per_bird": 0,
+  "total_amount": 0,
+  "buyer_name": "",
   "confidence": 0.0-1.0
 }
 
