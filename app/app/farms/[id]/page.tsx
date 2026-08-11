@@ -49,6 +49,7 @@ const CROP_TYPES = [
   { value: "onion", icon: "🧅", labelTa: "வெங்காயம்", labelEn: "Onion" },
   { value: "fodder_corn", icon: "🌽", labelTa: "மக்காச்சோளம்", labelEn: "Fodder Corn" },
   { value: "nell", icon: "🌾", labelTa: "நெல்", labelEn: "Nell (Rice)" },
+  { value: "groundnut", icon: "🥜", labelTa: "நிலக்கடலை", labelEn: "Groundnut" },
 ];
 
 const cropInfo = (value: string) =>

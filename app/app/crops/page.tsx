@@ -32,6 +32,7 @@ const CROP_EMOJIS: Record<string, string> = {
   onion: "🧅",
   fodder_corn: "🌽",
   nell: "🌾",
+  groundnut: "🥜",
 };
 
 const cropEmoji = (cropType: string) => CROP_EMOJIS[cropType] ?? "🌱";
@@ -45,6 +46,7 @@ const CROP_LABELS: Record<string, { en: string; ta: string }> = {
   onion: { en: "Onion", ta: "வெங்காயம்" },
   fodder_corn: { en: "Fodder Corn", ta: "மக்காச்சோளம்" },
   nell: { en: "Nell (Rice)", ta: "நெல்" },
+  groundnut: { en: "Groundnut", ta: "நிலக்கடலை" },
 };
 
 const cropLabel = (cropType: string, lang: "ta" | "en") => {
