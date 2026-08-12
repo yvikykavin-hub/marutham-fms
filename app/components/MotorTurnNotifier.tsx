@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { getTractorOilStatus } from "../lib/tractorOilStatus";
-import { calculateCurrentTurn, formatTurnEndTime, type TurnStatus } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime, formatNextTurnStartTime, type TurnStatus } from "../lib/motorTurnCalculator";
 
 const NOTIFICATION_CHECK_KEY = "marutham_last_notification_check";
 const DISMISSED_KEY = "marutham_dismissed_notifications";
@@ -93,7 +93,7 @@ const getMotorNotificationText = (
     };
   }
 
-  const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
+  const myNextStr = formatNextTurnStartTime(turnStatus.turnEndTime, lang);
   return {
     title: L(`💧 ${farmName} - ${turnStatus.ownerName}'s Turn`, `💧 ${farmName} - ${turnStatus.ownerName} முறை`),
     body: L(
@@ -222,7 +222,7 @@ export default function MotorTurnNotifier() {
         // 6 PM - a NEIGHBOR's turn starts right now, so the farmer knows
         // watering isn't theirs today and exactly when it will be again.
         if (hour === 18 && !turnStatus.isMyTurn && turnStatus.justStarted) {
-          const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
+          const myNextStr = formatNextTurnStartTime(turnStatus.turnEndTime, lang);
           await sendNotification(
             lang === "ta" ? `💧 ${farmName} - ${turnStatus.ownerName} முறை தொடங்கியது` : `💧 ${farmName} - ${turnStatus.ownerName}'s Turn Started`,
             lang === "ta"

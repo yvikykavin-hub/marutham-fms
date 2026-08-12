@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getValidationMessage } from "../lib/validation";
-import { calculateCurrentTurn, formatTurnEndTime, generateSchedule } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime, formatNextTurnStartTime, generateSchedule } from "../lib/motorTurnCalculator";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 
@@ -367,11 +367,11 @@ const MotorSharingSection = forwardRef<MotorSharingSectionHandle, { farmId: stri
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-white/70 text-xs mt-1.5">
                 {turnStatus.isMyTurn
                   ? language === "ta"
-                    ? `அடுத்து: ${getDisplayName(turnStatus.nextOwnerName)} முறை ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)} முதல்`
-                    : `Next: ${getDisplayName(turnStatus.nextOwnerName)}'s turn from ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)}`
+                    ? `அடுத்து: ${getDisplayName(turnStatus.nextOwnerName)} முறை ${formatNextTurnStartTime(turnStatus.turnEndTime, language)} முதல்`
+                    : `Next: ${getDisplayName(turnStatus.nextOwnerName)}'s turn from ${formatNextTurnStartTime(turnStatus.turnEndTime, language)}`
                   : language === "ta"
-                    ? `உங்கள் அடுத்த முறை ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)} தொடங்கும்`
-                    : `Your next turn starts ${formatTurnEndTime(turnStatus.nextTurnStartTime, language)}`}
+                    ? `உங்கள் அடுத்த முறை ${formatNextTurnStartTime(turnStatus.turnEndTime, language)} தொடங்கும்`
+                    : `Your next turn starts ${formatNextTurnStartTime(turnStatus.turnEndTime, language)}`}
               </motion.p>
             </div>
           </motion.div>

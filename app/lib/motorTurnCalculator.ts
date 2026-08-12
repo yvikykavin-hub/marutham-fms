@@ -270,6 +270,39 @@ export function formatTurnEndTime(endTime: Date, language: string): string {
   }
 }
 
+// Format next turn start time string — the next person's turn starts 1
+// minute after the current turn ends (6:01 PM, not 6:00 PM), so this never
+// reads as if two turns start/end at the exact same instant.
+export function formatNextTurnStartTime(endTime: Date, language: string): string {
+  const L = (en: string, ta: string) => (language === "ta" ? ta : en);
+
+  const startTime = new Date(endTime);
+  startTime.setMinutes(startTime.getMinutes() + 1);
+
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const timeStr = startTime.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const dateStr = startTime.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+
+  if (startTime.toDateString() === now.toDateString()) {
+    return L(`today at ${timeStr}`, `இன்று ${timeStr}`);
+  } else if (startTime.toDateString() === tomorrow.toDateString()) {
+    return L(`tomorrow at ${timeStr}`, `நாளை ${timeStr}`);
+  } else {
+    return L(`${dateStr} at ${timeStr}`, `${dateStr} ${timeStr}`);
+  }
+}
+
 // Get next turn info
 export function getNextTurnInfo(
   startDate: string,

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getTractorOilStatus } from "../lib/tractorOilStatus";
-import { calculateCurrentTurn, formatTurnEndTime } from "../lib/motorTurnCalculator";
+import { calculateCurrentTurn, formatTurnEndTime, formatNextTurnStartTime } from "../lib/motorTurnCalculator";
 
 type Severity = "danger" | "warning" | "info" | "success";
 
@@ -344,7 +344,7 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
           }
         } else {
           const endStr = formatTurnEndTime(turnStatus.turnEndTime, lang);
-          const myNextStr = formatTurnEndTime(turnStatus.nextTurnStartTime, lang);
+          const myNextStr = formatNextTurnStartTime(turnStatus.turnEndTime, lang);
           detected.push({
             id: `motor-neighbor-turn-${motor.id}-${todayStr}`,
             severity: "info",
