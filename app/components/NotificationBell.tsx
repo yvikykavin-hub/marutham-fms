@@ -19,6 +19,14 @@ type NotificationItem = {
   urgentMessage?: string;
 };
 
+// Sort: danger first, then warning, then success, then info
+const SEVERITY_ORDER: Record<string, number> = {
+  danger: 0,
+  warning: 1,
+  success: 2,
+  info: 3,
+};
+
 const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
 
 const getUserLanguage = (): "ta" | "en" => {
@@ -429,6 +437,94 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
     success: "bg-green-500",
   };
 
+  // Urgent (danger/warning/success/info) items sorted to the top, seasonal
+  // tip(s) always pinned to the bottom regardless of severity.
+  const sortedItems = [...items].sort((a, b) => {
+    const aOrder = SEVERITY_ORDER[a.severity] ?? 3;
+    const bOrder = SEVERITY_ORDER[b.severity] ?? 3;
+    return aOrder - bOrder;
+  });
+  const seasonalItems = sortedItems.filter((n) => n.id.startsWith("seasonal-"));
+  const urgentItems = sortedItems.filter((n) => !n.id.startsWith("seasonal-"));
+  const dangerItems = urgentItems.filter((n) => n.severity === "danger");
+  const nonDangerItems = urgentItems.filter((n) => n.severity !== "danger");
+
+  const renderNotificationCard = (item: NotificationItem) => (
+    <div
+      key={item.id}
+      className={`p-2.5 rounded-xl text-sm border transition-all duration-200 ${severityCls[item.severity] || severityCls.info}`}
+    >
+      <div className="flex items-start gap-2.5">
+        {/* Icon badge */}
+        <div
+          className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
+            severityIconBgCls[item.severity] || severityIconBgCls.info
+          }`}
+        >
+          <span className="text-base">{item.icon}</span>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          {/* Title */}
+          <p className={`font-medium leading-tight ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.title}</p>
+
+          {/* Message */}
+          {item.message && (
+            <p className={`text-xs mt-0.5 leading-relaxed ${severitySubTextCls[item.severity] || severitySubTextCls.info}`}>
+              {item.message}
+            </p>
+          )}
+
+          {/* Time */}
+          {item.time && (
+            <p className={`text-xs mt-1 opacity-60 ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.time}</p>
+          )}
+        </div>
+
+        {/* Dismiss button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            dismiss(item.id);
+          }}
+          className={`min-h-[24px] min-w-[24px] flex items-center justify-center text-current opacity-50 hover:opacity-100 shrink-0 rounded-lg transition-opacity ${
+            severityTextCls[item.severity] || severityTextCls.info
+          }`}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Bottom bar for urgent items */}
+      {item.severity === "danger" && (
+        <div className="mt-2 pt-2 border-t border-red-100 dark:border-red-800/30 flex items-center gap-1.5">
+          <motion.div
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1, repeat: Infinity }}
+            className={`w-1.5 h-1.5 rounded-full ${severityDotCls.danger}`}
+          />
+          <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+            {item.urgentMessage || (language === "ta" ? "உடனடி நடவடிக்கை தேவை" : "Immediate action required")}
+          </p>
+        </div>
+      )}
+
+      {/* Bottom bar for active motor turn */}
+      {item.severity === "success" && item.id.startsWith("motor-my-turn") && (
+        <div className="mt-2 pt-2 border-t border-green-100 dark:border-green-800/30 flex items-center gap-1.5">
+          <motion.div
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className={`w-1.5 h-1.5 rounded-full ${severityDotCls.success}`}
+          />
+          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+            {language === "ta" ? "இப்போதே பாசனம் செய்யலாம்" : "You can water your fields now"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   const handleBellClick = () => {
     // Refresh whenever the dropdown is opened, so anything that changed since
     // the last fetch (or the last dismissal) shows up immediately. Computed
@@ -492,81 +588,30 @@ export default function NotificationBell({ language = "en" }: { language?: "ta" 
             </div>
           ) : (
             <div className="p-2 space-y-1.5">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-2.5 rounded-xl text-sm border transition-all duration-200 ${severityCls[item.severity] || severityCls.info}`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    {/* Icon badge */}
-                    <div
-                      className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
-                        severityIconBgCls[item.severity] || severityIconBgCls.info
-                      }`}
-                    >
-                      <span className="text-base">{item.icon}</span>
-                    </div>
+              {dangerItems.length > 0 && (
+                <p className="text-xs font-medium text-red-500 dark:text-red-400 px-2 pt-1 pb-0.5">
+                  ⚠️ {L("Urgent", "அவசரம்")}
+                </p>
+              )}
+              {dangerItems.map(renderNotificationCard)}
 
-                    <div className="flex-1 min-w-0">
-                      {/* Title */}
-                      <p className={`font-medium leading-tight ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.title}</p>
+              {nonDangerItems.length > 0 && (
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2 pt-1 pb-0.5">
+                  {L("Updates", "புதுப்பிப்புகள்")}
+                </p>
+              )}
+              {nonDangerItems.map(renderNotificationCard)}
 
-                      {/* Message */}
-                      {item.message && (
-                        <p className={`text-xs mt-0.5 leading-relaxed ${severitySubTextCls[item.severity] || severitySubTextCls.info}`}>
-                          {item.message}
-                        </p>
-                      )}
+              {urgentItems.length > 0 && seasonalItems.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-slate-700 my-1 mx-2" />
+              )}
 
-                      {/* Time */}
-                      {item.time && (
-                        <p className={`text-xs mt-1 opacity-60 ${severityTextCls[item.severity] || severityTextCls.info}`}>{item.time}</p>
-                      )}
-                    </div>
-
-                    {/* Dismiss button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismiss(item.id);
-                      }}
-                      className={`min-h-[24px] min-w-[24px] flex items-center justify-center text-current opacity-50 hover:opacity-100 shrink-0 rounded-lg transition-opacity ${
-                        severityTextCls[item.severity] || severityTextCls.info
-                      }`}
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  {/* Bottom bar for urgent items */}
-                  {item.severity === "danger" && (
-                    <div className="mt-2 pt-2 border-t border-red-100 dark:border-red-800/30 flex items-center gap-1.5">
-                      <motion.div
-                        animate={{ opacity: [1, 0.3, 1] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                        className={`w-1.5 h-1.5 rounded-full ${severityDotCls.danger}`}
-                      />
-                      <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                        {item.urgentMessage || (language === "ta" ? "உடனடி நடவடிக்கை தேவை" : "Immediate action required")}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Bottom bar for active motor turn */}
-                  {item.severity === "success" && item.id.startsWith("motor-my-turn") && (
-                    <div className="mt-2 pt-2 border-t border-green-100 dark:border-green-800/30 flex items-center gap-1.5">
-                      <motion.div
-                        animate={{ opacity: [1, 0.3, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className={`w-1.5 h-1.5 rounded-full ${severityDotCls.success}`}
-                      />
-                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                        {language === "ta" ? "இப்போதே பாசனம் செய்யலாம்" : "You can water your fields now"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {seasonalItems.length > 0 && (
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2 pt-1 pb-0.5">
+                  💡 {L("Tips", "குறிப்புகள்")}
+                </p>
+              )}
+              {seasonalItems.map(renderNotificationCard)}
             </div>
           )}
         </div>

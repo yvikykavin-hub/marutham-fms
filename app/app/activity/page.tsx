@@ -22,31 +22,6 @@ type ActivityLogRow = {
   created_at: string;
 };
 
-const MODULES = [
-  "Milk Collection",
-  "Milk Rate",
-  "Milk Payment",
-  "Cow Expense",
-  "Farm",
-  "Crop",
-  "Income",
-  "Expense",
-  "Animal",
-  "Tractor",
-  "Tractor Diesel",
-  "Tractor Usage",
-  "Tractor Oil",
-  "Tractor Maintenance",
-  "Land Details",
-  "Land Document",
-  "Motor Sharing",
-  "Goat Income",
-  "Goat Expense",
-  "Hen Income",
-  "Hen Expense",
-  "Payment",
-];
-
 export default function ActivityPage() {
   const [lang, setLang] = useLang();
   const L = (en: string, ta: string) => (lang === "ta" ? ta : en);
@@ -275,11 +250,40 @@ export default function ActivityPage() {
                     className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="all">{L("All Modules", "அனைத்து பிரிவு")}</option>
-                    {MODULES.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
+
+                    <optgroup label={L("🐄 Livestock", "🐄 கால்நடை")}>
+                      <option value="Milk Collection">{L("Milk Collection", "பால் சேகரிப்பு")}</option>
+                      <option value="Milk Rate">{L("Milk Rate", "பால் விலை")}</option>
+                      <option value="Milk Payment">{L("Milk Payment", "பால் பணம்")}</option>
+                      <option value="Cow Expense">{L("Cow Expense", "மாடு செலவு")}</option>
+                      <option value="Goat Income">{L("Goat Income", "ஆடு வருமானம்")}</option>
+                      <option value="Goat Expense">{L("Goat Expense", "ஆடு செலவு")}</option>
+                      <option value="Hen Income">{L("Hen Income", "கோழி வருமானம்")}</option>
+                      <option value="Hen Expense">{L("Hen Expense", "கோழி செலவு")}</option>
+                      <option value="Animal">{L("Animal", "கால்நடை")}</option>
+                      <option value="Payment">{L("Payment", "பணம்")}</option>
+                    </optgroup>
+
+                    <optgroup label={L("🌾 Crops", "🌾 பயிர்கள்")}>
+                      <option value="Farm">{L("Farm", "பண்ணை")}</option>
+                      <option value="Crop">{L("Crop", "பயிர்")}</option>
+                      <option value="Income">{L("Income", "வருமானம்")}</option>
+                      <option value="Expense">{L("Expense", "செலவு")}</option>
+                    </optgroup>
+
+                    <optgroup label={L("🚜 Machinery", "🚜 இயந்திரங்கள்")}>
+                      <option value="Tractor">{L("Tractor", "டிராக்டர்")}</option>
+                      <option value="Tractor Diesel">{L("Tractor Diesel", "டிராக்டர் டீசல்")}</option>
+                      <option value="Tractor Usage">{L("Tractor Usage", "டிராக்டர் பயன்பாடு")}</option>
+                      <option value="Tractor Oil">{L("Tractor Oil", "டிராக்டர் எண்ணெய்")}</option>
+                      <option value="Tractor Maintenance">{L("Tractor Maintenance", "டிராக்டர் பராமரிப்பு")}</option>
+                    </optgroup>
+
+                    <optgroup label={L("🗺️ Land", "🗺️ நிலம்")}>
+                      <option value="Land Details">{L("Land Details", "நில விவரம்")}</option>
+                      <option value="Land Document">{L("Land Document", "நில ஆவணம்")}</option>
+                      <option value="Motor Sharing">{L("Motor Sharing", "மோட்டார் பகிர்வு")}</option>
+                    </optgroup>
                   </select>
                 </div>
 

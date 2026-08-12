@@ -339,7 +339,7 @@ export default function FinancePage() {
           ) : (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 transition-all">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 transition-all">
                 <AnimatedCard delay={0}>
                 <div className="bg-white rounded-2xl shadow-sm p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-green-50 rounded-full -mr-8 -mt-8" />
@@ -360,24 +360,6 @@ export default function FinancePage() {
                   <p className={`text-base font-bold ${totalNet >= 0 ? "text-emerald-600" : "text-orange-500"}`}>{inr(totalNet)}</p>
                 </div>
                 </AnimatedCard>
-                {bestCrop && (
-                  <AnimatedCard delay={0.3}>
-                  <div className="bg-white rounded-2xl shadow-sm p-5">
-                    <p className="text-xs text-gray-500">{L("Best Performing Crop", "சிறந்த செயல்திறன் பயிர்")}</p>
-                    <p className="text-sm font-semibold text-emerald-600">{bestCrop.label}</p>
-                    <p className="text-xs text-gray-500">{inr(bestCrop.net)}</p>
-                  </div>
-                  </AnimatedCard>
-                )}
-                {worstCrop && worstCrop !== bestCrop && (
-                  <AnimatedCard delay={0.4}>
-                  <div className="bg-white rounded-2xl shadow-sm p-5">
-                    <p className="text-xs text-gray-500">{L("Worst Performing Crop", "குறைந்த செயல்திறன் பயிர்")}</p>
-                    <p className="text-sm font-semibold text-orange-500">{worstCrop.label}</p>
-                    <p className="text-xs text-gray-500">{inr(worstCrop.net)}</p>
-                  </div>
-                  </AnimatedCard>
-                )}
               </div>
 
               {/* Chart card */}
@@ -426,6 +408,30 @@ export default function FinancePage() {
                   </div>
                 </div>
               </FadeIn>
+
+              {/* Best/Worst performing crop cards */}
+              {(bestCrop || (worstCrop && worstCrop !== bestCrop)) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all">
+                  {bestCrop && (
+                    <AnimatedCard delay={0}>
+                    <div className="bg-white rounded-2xl shadow-sm p-5">
+                      <p className="text-xs text-gray-500">{L("Best Performing Crop", "சிறந்த செயல்திறன் பயிர்")}</p>
+                      <p className="text-sm font-semibold text-emerald-600">{bestCrop.label}</p>
+                      <p className="text-xs text-gray-500">{inr(bestCrop.net)}</p>
+                    </div>
+                    </AnimatedCard>
+                  )}
+                  {worstCrop && worstCrop !== bestCrop && (
+                    <AnimatedCard delay={0.1}>
+                    <div className="bg-white rounded-2xl shadow-sm p-5">
+                      <p className="text-xs text-gray-500">{L("Worst Performing Crop", "குறைந்த செயல்திறன் பயிர்")}</p>
+                      <p className="text-sm font-semibold text-orange-500">{worstCrop.label}</p>
+                      <p className="text-xs text-gray-500">{inr(worstCrop.net)}</p>
+                    </div>
+                    </AnimatedCard>
+                  )}
+                </div>
+              )}
 
               {/* Yearly Comparison chart */}
               {yearlyData.length > 0 && (

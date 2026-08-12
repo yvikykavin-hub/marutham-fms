@@ -7,16 +7,6 @@ import AnimatedCard from "../../components/AnimatedCard";
 import { supabase } from "../../lib/supabase";
 import { t } from "../../lib/labels";
 import { useLang } from "../../lib/useLang";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 
 type MilkRow = {
   collection_date: string;
@@ -98,12 +88,6 @@ export default function LivestockLandingPage() {
   const goatProfit = goatIncome - goatExpense;
   const henProfit = henIncome - henExpense;
   const totalNetProfit = cattleProfit + goatProfit + henProfit;
-
-  const chartData = [
-    { name: `🐄🐃 ${t(lang, "cows")}`, income: cattleIncome, expense: cattleExpense, profit: Math.max(0, cattleProfit) },
-    { name: `🐐 ${t(lang, "goats")}`, income: goatIncome, expense: goatExpense, profit: Math.max(0, goatProfit) },
-    { name: `🐔 ${t(lang, "hens")}`, income: henIncome, expense: henExpense, profit: Math.max(0, henProfit) },
-  ];
 
   const cards = [
     { href: "/livestock/cows", icon: "🐄🐃", label: t(lang, "cows") },
@@ -240,26 +224,6 @@ export default function LivestockLandingPage() {
                   </table>
                 </div>
 
-                {/* Spacing between table and chart */}
-                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">📊 {t(lang, "chartOverview")}</p>
-                  <div className="overflow-x-auto">
-                    <div style={{ minWidth: 300 }}>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`} />
-                          <Tooltip formatter={(value, name) => [`₹${Number(value).toLocaleString("en-IN")}`, name]} />
-                          <Legend wrapperStyle={{ fontSize: "11px" }} />
-                          <Bar dataKey="income" name={t(lang, "income")} fill="#22c55e" radius={[4, 4, 0, 0]} isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
-                          <Bar dataKey="expense" name={t(lang, "expense")} fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
-                          <Bar dataKey="profit" name={t(lang, "profit")} fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>

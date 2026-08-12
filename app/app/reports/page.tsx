@@ -518,6 +518,9 @@ export default function ReportsPage() {
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500" />
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500" />
                   </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    ⚠️ {L("Date range overrides year filter", "தேதி வரம்பு ஆண்டு வடிகட்டியை மேலெழுதும்")}
+                  </p>
                 </div>
                 <button
                   onClick={generateReport}
@@ -698,17 +701,17 @@ export default function ReportsPage() {
                       <h3 className="text-base font-semibold text-gray-800 mb-2">💡 {L("Key Insights", "முக்கிய தகவல்கள்")}</h3>
                       <div className="flex flex-col gap-1 text-xs text-gray-700">
                         {bestCrop && (
-                          <p>✅ {L("Most Profitable", "அதிக லாபம்")}: {cropLabel(bestCrop.cropType, lang)} ({inr(bestCrop.net)})</p>
+                          <p>🏆 {L("Most Profitable", "அதிக லாபம்")}: {cropLabel(bestCrop.cropType, lang)} — {inr(bestCrop.net)}</p>
                         )}
                         {worstCrop && worstCrop !== bestCrop && (
-                          <p>❌ {L("Least Profitable", "குறைந்த லாபம்")}: {cropLabel(worstCrop.cropType, lang)} ({inr(worstCrop.net)})</p>
+                          <p>📉 {L("Lowest Profit", "குறைந்த லாபம்")}: {cropLabel(worstCrop.cropType, lang)} — {inr(worstCrop.net)}</p>
                         )}
                         <p>📈 {L("Overall Profit Margin", "மொத்த லாப வரம்பு")}: {overallMargin.toFixed(0)}%</p>
                         {highestIncomeCrop && (
-                          <p>💰 {L("Highest Income Crop", "அதிக வருமான பயிர்")}: {cropLabel(highestIncomeCrop.cropType, lang)}</p>
+                          <p>💰 {L("Highest Income", "அதிக வருமானம்")}: {cropLabel(highestIncomeCrop.cropType, lang)} — {inr(highestIncomeCrop.income)}</p>
                         )}
                         {highestExpenseCrop && (
-                          <p>💸 {L("Highest Expense Crop", "அதிக செலவு பயிர்")}: {cropLabel(highestExpenseCrop.cropType, lang)}</p>
+                          <p>💸 {L("Highest Expense", "அதிக செலவு")}: {cropLabel(highestExpenseCrop.cropType, lang)} — {inr(highestExpenseCrop.expense)}</p>
                         )}
                       </div>
                     </div>
