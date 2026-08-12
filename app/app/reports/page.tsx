@@ -23,6 +23,7 @@ const CROP_LABELS: Record<string, { en: string; ta: string; emoji: string }> = {
   onion: { en: "Onion", ta: "வெங்காயம்", emoji: "🧅" },
   fodder_corn: { en: "Fodder Corn", ta: "மக்காச்சோளம்", emoji: "🌽" },
   nell: { en: "Nell (Rice)", ta: "நெல்", emoji: "🌾" },
+  groundnut: { en: "Groundnut", ta: "நிலக்கடலை", emoji: "🥜" },
 };
 
 const CATEGORY_LABELS: Record<string, { en: string; ta: string; emoji: string }> = {
@@ -133,12 +134,16 @@ export default function ReportsPage() {
       { data: incomeData },
       { data: expenseData },
       { data: riceIncomeData },
+      { data: groundnutIncomeData },
+      { data: groundnutExpenseData },
     ] = await Promise.all([
       supabase.from("cultivations").select("id, farm_id, crop_type"),
       supabase.from("farms").select("id, name").order("name", { ascending: true }),
       supabase.from("income_records").select("cultivation_id, income_date, amount"),
       supabase.from("expense_records").select("cultivation_id, expense_date, amount, category"),
       supabase.from("rice_income").select("cultivation_id, date, total_amount"),
+      supabase.from("groundnut_income").select("cultivation_id, harvest_date, total_amount"),
+      supabase.from("groundnut_expenses").select("cultivation_id, expense_date, amount, expense_type"),
     ]);
 
     if (cultivationsData) setCultivations(cultivationsData);
@@ -150,13 +155,22 @@ export default function ReportsPage() {
     const income: IncomeRow[] = [
       ...(incomeData ?? []).map((r) => ({ cultivation_id: r.cultivation_id, date: String(r.income_date), amount: Number(r.amount) })),
       ...(riceIncomeData ?? []).map((r) => ({ cultivation_id: r.cultivation_id, date: String(r.date), amount: Number(r.total_amount) })),
+      ...(groundnutIncomeData ?? []).map((r) => ({ cultivation_id: r.cultivation_id, date: String(r.harvest_date), amount: Number(r.total_amount) })),
     ];
-    const expense: ExpenseRow[] = (expenseData ?? []).map((r) => ({
-      cultivation_id: r.cultivation_id,
-      date: String(r.expense_date),
-      amount: Number(r.amount),
-      category: r.category ?? "miscellaneous",
-    }));
+    const expense: ExpenseRow[] = [
+      ...(expenseData ?? []).map((r) => ({
+        cultivation_id: r.cultivation_id,
+        date: String(r.expense_date),
+        amount: Number(r.amount),
+        category: r.category ?? "miscellaneous",
+      })),
+      ...(groundnutExpenseData ?? []).map((r) => ({
+        cultivation_id: r.cultivation_id,
+        date: String(r.expense_date),
+        amount: Number(r.amount),
+        category: r.expense_type ?? "miscellaneous",
+      })),
+    ];
 
     setIncomeRows(income);
     setExpenseRows(expense);
