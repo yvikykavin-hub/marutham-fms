@@ -2619,6 +2619,10 @@ export default function CropDetail() {
   const totalExpenses = expenseRecords.reduce((sum, r) => sum + Number(r.amount), 0);
   const netProfit = totalIncome - totalExpenses;
 
+  const groundnutTotalIncome = groundnutIncomes.reduce((sum, i) => sum + Number(i.total_amount), 0);
+  const groundnutTotalExpenses = groundnutExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const groundnutNetProfit = groundnutTotalIncome - groundnutTotalExpenses;
+
   const isCultivationDone = !!cultivation?.end_date;
   const cultivationStatusLabel = isCultivationDone
     ? L("Cultivation Done", "பயிர் முடிந்தது")
@@ -4003,11 +4007,11 @@ export default function CropDetail() {
                               </span>
                             </div>
                             {isExpanded && details.length > 0 && (
-                              <div className="bg-gray-50 rounded-lg p-2 mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                              <div className="bg-gray-50 rounded-lg p-2 mt-1 space-y-0.5 text-xs text-gray-600">
                                 {details.map((d, i) => (
-                                  <div key={i} className="flex justify-between gap-2">
-                                    <span className="text-gray-500">{d.label}:</span>
-                                    <span className="font-medium text-gray-800">{d.value}</span>
+                                  <div key={i} className="flex items-start gap-1.5">
+                                    <span className="text-gray-500 flex-shrink-0 min-w-0">{d.label}:</span>
+                                    <span className="font-medium text-gray-800 break-words">{d.value}</span>
                                   </div>
                                 ))}
                               </div>
@@ -4298,199 +4302,9 @@ export default function CropDetail() {
 
               {isGroundnut && (
                 <div className="space-y-4">
-                  {/* ── EXPENSES ── */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💰 {L("Add Expense", "செலவு சேர்")}</h2>
-
-                    <div className="space-y-3">
-                      {/* Expense type */}
-                      <div>
-                        <label className={labelCls}>{L("Expense Type", "செலவு வகை")}</label>
-                        <select value={groundnutExpenseType} onChange={(e) => setGroundnutExpenseType(e.target.value)} className={inputCls}>
-                          {GROUNDNUT_EXPENSE_TYPES.map((t) => (
-                            <option className="text-gray-900" key={t.value} value={t.value}>
-                              {L(t.en, t.ta)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Date */}
-                      <div>
-                        <label className={labelCls}>{L("Date", "தேதி")}</label>
-                        <input
-                          type="date"
-                          max={new Date().toISOString().split("T")[0]}
-                          value={groundnutExpenseDate}
-                          onChange={(e) => setGroundnutExpenseDate(e.target.value)}
-                          className={inputCls}
-                        />
-                      </div>
-
-                      {/* Seed Purchase fields */}
-                      {groundnutExpenseType === "seed_purchase" && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>{L("Quantity (kg)", "அளவு (கி)")}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={groundnutExpenseQty}
-                              onChange={(e) => setGroundnutExpenseQty(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "-") e.preventDefault();
-                              }}
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>{L("Rate/kg (₹)", "விலை/கி (₹)")}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={groundnutExpenseRate}
-                              onChange={(e) => setGroundnutExpenseRate(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "-") e.preventDefault();
-                              }}
-                              className={inputCls}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Dry Leaf Rolling fields */}
-                      {groundnutExpenseType === "dry_leaf_rolling" && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>{L("No. of Rolls", "சுருள் எண்")}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={groundnutExpenseRolls}
-                              onChange={(e) => setGroundnutExpenseRolls(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "-") e.preventDefault();
-                              }}
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>{L("Rate/Roll (₹)", "விலை/சுருள் (₹)")}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={groundnutExpenseRatePerRoll}
-                              onChange={(e) => setGroundnutExpenseRatePerRoll(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "-") e.preventDefault();
-                              }}
-                              className={inputCls}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Auto total for seed/rolls */}
-                      {(groundnutExpenseType === "seed_purchase" || groundnutExpenseType === "dry_leaf_rolling") && (
-                        <div>
-                          <label className={labelCls}>{L("Total Amount (₹)", "மொத்த தொகை (₹)")}</label>
-                          <input
-                            type="number"
-                            readOnly
-                            value={
-                              groundnutExpenseType === "seed_purchase"
-                                ? ((Number(groundnutExpenseQty) || 0) * (Number(groundnutExpenseRate) || 0)).toFixed(2)
-                                : ((Number(groundnutExpenseRolls) || 0) * (Number(groundnutExpenseRatePerRoll) || 0)).toFixed(2)
-                            }
-                            className={`${inputCls} bg-gray-50 dark:bg-slate-700/50`}
-                          />
-                        </div>
-                      )}
-
-                      {/* Amount for other types */}
-                      {groundnutExpenseType !== "seed_purchase" && groundnutExpenseType !== "dry_leaf_rolling" && (
-                        <div>
-                          <label className={labelCls}>{L("Amount (₹)", "தொகை (₹)")}</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={groundnutExpenseAmount}
-                            onChange={(e) => setGroundnutExpenseAmount(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "-") e.preventDefault();
-                            }}
-                            className={inputCls}
-                          />
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      <div>
-                        <label className={labelCls}>{L("Notes (optional)", "குறிப்பு (விருப்பம்)")}</label>
-                        <input type="text" value={groundnutExpenseNotes} onChange={(e) => setGroundnutExpenseNotes(e.target.value)} className={inputCls} />
-                      </div>
-
-                      {/* Save button */}
-                      <button
-                        onClick={saveGroundnutExpense}
-                        disabled={savingGroundnutExpense}
-                        className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-xl py-2.5 text-sm font-medium transition"
-                      >
-                        {savingGroundnutExpense ? "..." : L("Add Expense", "செலவு சேர்")}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* ── EXPENSE RECORDS ── */}
-                  {groundnutExpenses.length > 0 && (
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                      <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">📋 {L("Expense Records", "செலவு பதிவுகள்")}</h2>
-
-                      <div className="space-y-2">
-                        {groundnutExpenses.map((exp) => {
-                          const expType = GROUNDNUT_EXPENSE_TYPES.find((t) => t.value === exp.expense_type);
-                          return (
-                            <div key={exp.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-slate-700 last:border-0">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                                  {L(expType?.en || exp.expense_type, expType?.ta || exp.expense_type)}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  {exp.expense_date}
-                                  {exp.number_of_rolls ? ` · ${exp.number_of_rolls} ${L("rolls", "சுருள்")}` : ""}
-                                  {exp.quantity ? ` · ${exp.quantity}kg` : ""}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 ml-2">
-                                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
-                                  ₹{Number(exp.amount).toLocaleString("en-IN")}
-                                </p>
-                                <button
-                                  onClick={() => deleteGroundnutExpense(exp.id)}
-                                  className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* Total */}
-                        <div className="flex justify-between pt-2 mt-1 border-t border-gray-200 dark:border-slate-600">
-                          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{L("Total", "மொத்தம்")}</p>
-                          <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            ₹{groundnutExpenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString("en-IN")}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* ── INCOME ── */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💵 {L("Add Harvest Income", "அறுவடை வருமானம் சேர்")}</h2>
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3">
+                    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💰 {L("Income", "வருமானம்")}</h2>
 
                     <div className="space-y-3">
                       {/* Harvest date */}
@@ -4630,54 +4444,227 @@ export default function CropDetail() {
                       <button
                         onClick={saveGroundnutIncome}
                         disabled={savingGroundnutIncome}
-                        className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-xl py-2.5 text-sm font-medium transition"
+                        className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
                       >
                         {savingGroundnutIncome ? "..." : L("Save Income", "வருமானம் சேமி")}
                       </button>
                     </div>
-                  </div>
 
-                  {/* ── INCOME RECORDS ── */}
-                  {groundnutIncomes.length > 0 && (
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-                      <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">📋 {L("Harvest Records", "அறுவடை பதிவுகள்")}</h2>
-
-                      <div className="space-y-2">
+                    {/* Income records inline below */}
+                    {groundnutIncomes.length > 0 && (
+                      <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
                         {groundnutIncomes.map((inc) => (
-                          <div key={inc.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-slate-700 last:border-0">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{inc.harvest_date}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {inc.quantity_kg ? `${inc.quantity_kg}kg` : `${inc.quantity_ton}ton`}
-                                {" · "}
-                                ₹{inc.rate_per_unit}/{inc.quantity_unit}
-                                {inc.buyer_name ? ` · ${inc.buyer_name}` : ""}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 ml-2">
-                              <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                          <div key={inc.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 dark:border-slate-700 py-1">
+                            <span className="truncate">
+                              {inc.harvest_date}
+                              {" · "}
+                              {inc.quantity_kg ? `${inc.quantity_kg}kg` : `${inc.quantity_ton}ton`}
+                              {" · "}
+                              ₹{inc.rate_per_unit}/{inc.quantity_unit}
+                              {inc.buyer_name ? ` · ${inc.buyer_name}` : ""}
+                            </span>
+                            <span className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-semibold text-primary">
                                 ₹{Number(inc.total_amount).toLocaleString("en-IN")}
-                              </p>
-                              <button
-                                onClick={() => deleteGroundnutIncome(inc.id)}
-                                className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                              >
+                              </span>
+                              <button onClick={() => deleteGroundnutIncome(inc.id)} className="hover:text-danger">
                                 🗑️
                               </button>
-                            </div>
+                            </span>
                           </div>
                         ))}
-
-                        {/* Total */}
-                        <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-slate-600">
-                          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{L("Total Income", "மொத்த வருமானம்")}</p>
-                          <p className="text-sm font-bold text-green-700 dark:text-green-400">
-                            ₹{groundnutIncomes.reduce((sum, i) => sum + Number(i.total_amount), 0).toLocaleString("en-IN")}
-                          </p>
-                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {/* ── EXPENSES ── */}
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3">
+                    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💸 {L("Expenses", "செலவுகள்")}</h2>
+
+                    <div className="space-y-3">
+                      {/* Expense type */}
+                      <div>
+                        <label className={labelCls}>{L("Expense Type", "செலவு வகை")}</label>
+                        <select value={groundnutExpenseType} onChange={(e) => setGroundnutExpenseType(e.target.value)} className={inputCls}>
+                          {GROUNDNUT_EXPENSE_TYPES.map((t) => (
+                            <option className="text-gray-900" key={t.value} value={t.value}>
+                              {L(t.en, t.ta)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Date */}
+                      <div>
+                        <label className={labelCls}>{L("Date", "தேதி")}</label>
+                        <input
+                          type="date"
+                          max={new Date().toISOString().split("T")[0]}
+                          value={groundnutExpenseDate}
+                          onChange={(e) => setGroundnutExpenseDate(e.target.value)}
+                          className={inputCls}
+                        />
+                      </div>
+
+                      {/* Seed Purchase fields */}
+                      {groundnutExpenseType === "seed_purchase" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>{L("Quantity (kg)", "அளவு (கி)")}</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={groundnutExpenseQty}
+                              onChange={(e) => setGroundnutExpenseQty(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "-") e.preventDefault();
+                              }}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>{L("Rate/kg (₹)", "விலை/கி (₹)")}</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={groundnutExpenseRate}
+                              onChange={(e) => setGroundnutExpenseRate(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "-") e.preventDefault();
+                              }}
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Dry Leaf Rolling fields */}
+                      {groundnutExpenseType === "dry_leaf_rolling" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>{L("No. of Rolls", "சுருள் எண்")}</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={groundnutExpenseRolls}
+                              onChange={(e) => setGroundnutExpenseRolls(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "-") e.preventDefault();
+                              }}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>{L("Rate/Roll (₹)", "விலை/சுருள் (₹)")}</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={groundnutExpenseRatePerRoll}
+                              onChange={(e) => setGroundnutExpenseRatePerRoll(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "-") e.preventDefault();
+                              }}
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Auto total for seed/rolls */}
+                      {(groundnutExpenseType === "seed_purchase" || groundnutExpenseType === "dry_leaf_rolling") && (
+                        <div>
+                          <label className={labelCls}>{L("Total Amount (₹)", "மொத்த தொகை (₹)")}</label>
+                          <input
+                            type="number"
+                            readOnly
+                            value={
+                              groundnutExpenseType === "seed_purchase"
+                                ? ((Number(groundnutExpenseQty) || 0) * (Number(groundnutExpenseRate) || 0)).toFixed(2)
+                                : ((Number(groundnutExpenseRolls) || 0) * (Number(groundnutExpenseRatePerRoll) || 0)).toFixed(2)
+                            }
+                            className={`${inputCls} bg-gray-50 dark:bg-slate-700/50`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Amount for other types */}
+                      {groundnutExpenseType !== "seed_purchase" && groundnutExpenseType !== "dry_leaf_rolling" && (
+                        <div>
+                          <label className={labelCls}>{L("Amount (₹)", "தொகை (₹)")}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={groundnutExpenseAmount}
+                            onChange={(e) => setGroundnutExpenseAmount(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "-") e.preventDefault();
+                            }}
+                            className={inputCls}
+                          />
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      <div>
+                        <label className={labelCls}>{L("Notes (optional)", "குறிப்பு (விருப்பம்)")}</label>
+                        <input type="text" value={groundnutExpenseNotes} onChange={(e) => setGroundnutExpenseNotes(e.target.value)} className={inputCls} />
+                      </div>
+
+                      {/* Save button */}
+                      <button
+                        onClick={saveGroundnutExpense}
+                        disabled={savingGroundnutExpense}
+                        className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
+                      >
+                        {savingGroundnutExpense ? "..." : L("Save Expense", "செலவு சேமி")}
+                      </button>
                     </div>
-                  )}
+
+                    {/* Expense records inline below */}
+                    {groundnutExpenses.length > 0 && (
+                      <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
+                        {groundnutExpenses.map((exp) => {
+                          const expType = GROUNDNUT_EXPENSE_TYPES.find((t) => t.value === exp.expense_type);
+                          return (
+                            <div key={exp.id} className="flex justify-between items-center text-xs text-gray-700 border-b border-gray-100 dark:border-slate-700 py-1">
+                              <span className="truncate">
+                                {exp.expense_date}
+                                {" · "}
+                                {L(expType?.en || exp.expense_type, expType?.ta || exp.expense_type)}
+                                {exp.number_of_rolls ? ` · ${exp.number_of_rolls} rolls` : ""}
+                                {exp.quantity ? ` · ${exp.quantity}kg` : ""}
+                              </span>
+                              <span className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-semibold text-red-600">
+                                  ₹{Number(exp.amount).toLocaleString("en-IN")}
+                                </span>
+                                <button onClick={() => deleteGroundnutExpense(exp.id)} className="hover:text-danger">
+                                  🗑️
+                                </button>
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Summary */}
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-2">
+                    <div className="flex justify-between text-xs text-gray-700 font-medium mb-0.5">
+                      <span>💰 {L("Total Income", "மொத்த வருமானம்")}</span>
+                      <span>₹{groundnutTotalIncome.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-700 font-medium mb-0.5">
+                      <span>💸 {L("Total Expenses", "மொத்த செலவு")}</span>
+                      <span>₹{groundnutTotalExpenses.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-slate-600 my-1" />
+                    <div className={`flex justify-between text-base font-bold ${groundnutNetProfit >= 0 ? "text-success" : "text-danger"}`}>
+                      <span>{groundnutNetProfit >= 0 ? `📈 ${L("Net Profit", "நிகர லாபம்")}` : `📉 ${L("Net Loss", "நிகர நஷ்டம்")}`}</span>
+                      <span>₹{Math.abs(groundnutNetProfit).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
