@@ -3489,7 +3489,7 @@ export default function CropDetail() {
 
                   <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-sm font-semibold text-gray-800">🌾 {L("Expenses", "செலவுகள்")}</h2>
+                      <h2 className="text-sm font-semibold text-gray-800">💸 {L("Expenses", "செலவுகள்")}</h2>
                       <button
                         onClick={openAddRiceExpense}
                         className="bg-primary hover:bg-primary/90 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition"
@@ -3699,7 +3699,7 @@ export default function CropDetail() {
                       disabled={savingTurmericSale}
                       className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
                     >
-                      {savingTurmericSale ? "..." : L("Save Sale", "விற்பனை சேமி")}
+                      {savingTurmericSale ? "..." : L("Save Income", "வருமானம் சேமி")}
                     </button>
                   </>
                 ) : isSugarcane ? (
@@ -4027,7 +4027,7 @@ export default function CropDetail() {
               {/* Expenses */}
               <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3">
                 <h2 className="text-sm font-semibold text-gray-800 mb-2">
-                  💸 {isTurmeric ? L("Expense Breakdown by Stage", "செலவு பகுப்பு") : L("Expenses", "செலவுகள்")}
+                  💸 {L("Expenses", "செலவுகள்")}
                 </h2>
 
                 {isTurmeric && (
@@ -4306,7 +4306,7 @@ export default function CropDetail() {
                   <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3">
                     <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💰 {L("Income", "வருமானம்")}</h2>
 
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
                       {/* Harvest date */}
                       <div>
                         <label className={labelCls}>{L("Harvest Date", "அறுவடை தேதி")}</label>
@@ -4439,16 +4439,16 @@ export default function CropDetail() {
                         <label className={labelCls}>{L("Notes (optional)", "குறிப்பு (விருப்பம்)")}</label>
                         <input type="text" value={groundnutIncomeNotes} onChange={(e) => setGroundnutIncomeNotes(e.target.value)} className={inputCls} />
                       </div>
-
-                      {/* Save button */}
-                      <button
-                        onClick={saveGroundnutIncome}
-                        disabled={savingGroundnutIncome}
-                        className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
-                      >
-                        {savingGroundnutIncome ? "..." : L("Save Income", "வருமானம் சேமி")}
-                      </button>
                     </div>
+
+                    {/* Save button */}
+                    <button
+                      onClick={saveGroundnutIncome}
+                      disabled={savingGroundnutIncome}
+                      className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
+                    >
+                      {savingGroundnutIncome ? "..." : L("Save Income", "வருமானம் சேமி")}
+                    </button>
 
                     {/* Income records inline below */}
                     {groundnutIncomes.length > 0 && (
@@ -4481,7 +4481,7 @@ export default function CropDetail() {
                   <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3">
                     <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">💸 {L("Expenses", "செலவுகள்")}</h2>
 
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
                       {/* Expense type */}
                       <div>
                         <label className={labelCls}>{L("Expense Type", "செலவு வகை")}</label>
@@ -4508,7 +4508,7 @@ export default function CropDetail() {
 
                       {/* Seed Purchase fields */}
                       {groundnutExpenseType === "seed_purchase" && (
-                        <div className="grid grid-cols-2 gap-3">
+                        <>
                           <div>
                             <label className={labelCls}>{L("Quantity (kg)", "அளவு (கி)")}</label>
                             <input
@@ -4535,12 +4535,12 @@ export default function CropDetail() {
                               className={inputCls}
                             />
                           </div>
-                        </div>
+                        </>
                       )}
 
                       {/* Dry Leaf Rolling fields */}
                       {groundnutExpenseType === "dry_leaf_rolling" && (
-                        <div className="grid grid-cols-2 gap-3">
+                        <>
                           <div>
                             <label className={labelCls}>{L("No. of Rolls", "சுருள் எண்")}</label>
                             <input
@@ -4567,7 +4567,7 @@ export default function CropDetail() {
                               className={inputCls}
                             />
                           </div>
-                        </div>
+                        </>
                       )}
 
                       {/* Auto total for seed/rolls */}
@@ -4609,16 +4609,16 @@ export default function CropDetail() {
                         <label className={labelCls}>{L("Notes (optional)", "குறிப்பு (விருப்பம்)")}</label>
                         <input type="text" value={groundnutExpenseNotes} onChange={(e) => setGroundnutExpenseNotes(e.target.value)} className={inputCls} />
                       </div>
-
-                      {/* Save button */}
-                      <button
-                        onClick={saveGroundnutExpense}
-                        disabled={savingGroundnutExpense}
-                        className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
-                      >
-                        {savingGroundnutExpense ? "..." : L("Save Expense", "செலவு சேமி")}
-                      </button>
                     </div>
+
+                    {/* Save button */}
+                    <button
+                      onClick={saveGroundnutExpense}
+                      disabled={savingGroundnutExpense}
+                      className="bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white rounded-lg px-4 py-1.5 text-sm font-medium transition shadow-sm"
+                    >
+                      {savingGroundnutExpense ? "..." : L("Save Expense", "செலவு சேமி")}
+                    </button>
 
                     {/* Expense records inline below */}
                     {groundnutExpenses.length > 0 && (
