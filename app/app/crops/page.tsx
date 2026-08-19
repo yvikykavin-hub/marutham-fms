@@ -54,6 +54,13 @@ const cropLabel = (cropType: string, lang: "ta" | "en") => {
   return l ? (lang === "ta" ? l.ta : l.en) : cropType;
 };
 
+const CROP_TYPES = Object.keys(CROP_LABELS).map((value) => ({
+  value,
+  en: CROP_LABELS[value].en,
+  ta: CROP_LABELS[value].ta,
+  emoji: CROP_EMOJIS[value],
+}));
+
 const formatDMY = (iso: string | null | undefined) => {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
@@ -78,6 +85,7 @@ export default function CropsPage() {
   const [justUpdated, setJustUpdated] = useState(false);
   const [search, setSearch] = useState("");
   const [farmFilter, setFarmFilter] = useState("");
+  const [selectedCropType, setSelectedCropType] = useState("all");
 
   useEffect(() => {
     fetchAll();
@@ -118,11 +126,12 @@ export default function CropsPage() {
         farmName(c.farm_id).toLowerCase().includes(search.trim().toLowerCase())
       : true;
     const matchesFarm = farmFilter ? c.farm_id === farmFilter : true;
-    return matchesSearch && matchesFarm;
+    const matchesCropType = selectedCropType === "all" ? true : c.crop_type === selectedCropType;
+    return matchesSearch && matchesFarm && matchesCropType;
   };
 
-  const filteredActive = useMemo(() => activeCrops.filter(matchesFilters), [activeCrops, search, farmFilter, farms]);
-  const filteredCompleted = useMemo(() => completedCrops.filter(matchesFilters), [completedCrops, search, farmFilter, farms]);
+  const filteredActive = useMemo(() => activeCrops.filter(matchesFilters), [activeCrops, search, farmFilter, selectedCropType, farms]);
+  const filteredCompleted = useMemo(() => completedCrops.filter(matchesFilters), [completedCrops, search, farmFilter, selectedCropType, farms]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
@@ -178,6 +187,32 @@ export default function CropsPage() {
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setSelectedCropType("all")}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                selectedCropType === "all"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              {L("All", "அனைத்தும்")}
+            </button>
+            {CROP_TYPES.map((ct) => (
+              <button
+                key={ct.value}
+                onClick={() => setSelectedCropType(ct.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                  selectedCropType === ct.value
+                    ? "bg-primary text-white border-primary"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                {ct.emoji} {lang === "ta" ? ct.ta : ct.en}
+              </button>
+            ))}
           </div>
 
           {loading ? (

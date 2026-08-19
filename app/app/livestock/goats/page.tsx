@@ -127,8 +127,17 @@ export default function GoatsListPage() {
   const activeGoats = goats.filter((g) => g.current_status === "active").length;
   const soldGoats = goats.filter((g) => g.current_status === "sold").length;
 
-  const totalIncome = sales.reduce((sum, s) => sum + Number(s.total_amount), 0);
-  const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  // Year filter for the financial stat cards only — animal counts above and the
+  // Income/Expenses tab tables continue to show all-time/all records.
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const yearStr = String(selectedYear);
+  const filteredIncome = sales.filter((s) => s.sale_date?.startsWith(yearStr));
+  const filteredExpense = expenses.filter((e) => e.expense_date?.startsWith(yearStr));
+
+  const totalIncome = filteredIncome.reduce((sum, s) => sum + Number(s.total_amount), 0);
+  const totalExpense = filteredExpense.reduce((sum, e) => sum + Number(e.amount), 0);
   const netPL = totalIncome - totalExpense;
 
   const openAddModal = () => {
@@ -398,7 +407,7 @@ export default function GoatsListPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-white rounded-xl shadow-sm p-3">
               <p className="text-xs text-gray-500">{t(lang, "total")}</p>
               <p className="text-xl font-bold text-gray-800">{totalGoats}</p>
@@ -411,6 +420,20 @@ export default function GoatsListPage() {
               <p className="text-xs text-gray-500">{t(lang, "sold")}</p>
               <p className="text-xl font-bold text-blue-600">{soldGoats}</p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">{t(lang, "selectYear")}:</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+              className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px] sm:min-h-0"
+            >
+              {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
             <div className="bg-white rounded-xl shadow-sm p-3">
               <p className="text-xs text-gray-500">{t(lang, "income")}</p>
               <p className="text-xl font-bold text-success">{inr(totalIncome)}</p>

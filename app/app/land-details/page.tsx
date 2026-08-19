@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Sidebar from "../../components/Sidebar";
@@ -13,6 +13,7 @@ import { useLang } from "../../lib/useLang";
 type Farm = {
   id: string;
   name: string | null;
+  name_tamil: string | null;
   owner_name: string | null;
   area: number | null;
   total_area: number | null;
@@ -63,6 +64,7 @@ export default function LandDetailsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchFarms();
@@ -80,6 +82,18 @@ export default function LandDetailsPage() {
     setLoading(false);
     setIsRefreshing(false);
   };
+
+  const filteredLandDetails = useMemo(() => {
+    if (!searchQuery.trim()) return farms;
+    const q = searchQuery.trim().toLowerCase();
+    return farms.filter((farm) =>
+      farm.name?.toLowerCase().includes(q) ||
+      farm.name_tamil?.toLowerCase().includes(q) ||
+      farm.survey_numbers?.toLowerCase().includes(q) ||
+      farm.patta_number?.toLowerCase().includes(q) ||
+      farm.owner_name?.toLowerCase().includes(q)
+    );
+  }, [farms, searchQuery]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
@@ -111,6 +125,28 @@ export default function LandDetailsPage() {
             </button>
           </div>
 
+          {!loading && farms.length > 0 && (
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={L("Search by name, survey no., patta no., owner...", "பெயர், சர்வே எண், பட்டா எண், உரிமையாளர் மூலம் தேடுங்கள்...")}
+                className="w-full border border-gray-300 dark:border-gray-700 rounded-lg pl-9 pr-9 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={L("Clear search", "தேடலை அழி")}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <SkeletonList count={4} />
           ) : farms.length === 0 ? (
@@ -120,9 +156,22 @@ export default function LandDetailsPage() {
               subtitle={L("Add a farm from the Dashboard to see its land details here", "இங்கே நில விவரங்களைக் காண முகப்புத் திரையில் இருந்து நிலம் சேர்க்கவும்")}
               action={{ label: L("Go to Dashboard", "முகப்புக்கு செல்"), onClick: () => router.push("/") }}
             />
+          ) : filteredLandDetails.length === 0 && searchQuery ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <span className="text-3xl">🔍</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {L(`No results for "${searchQuery}"`, `"${searchQuery}" க்கு முடிவுகள் இல்லை`)}
+              </p>
+              <button
+                onClick={() => setSearchQuery("")}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                {L("Clear search", "தேடலை அழி")}
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {farms.map((f, i) => {
+              {filteredLandDetails.map((f, i) => {
                 const soil = f.soil_type ? SOIL_LABELS[f.soil_type] : null;
                 const water = f.water_source ? WATER_SOURCE_LABELS[f.water_source] : null;
                 const area = effectiveArea(f);

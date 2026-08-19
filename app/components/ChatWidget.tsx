@@ -39,6 +39,15 @@ type SpeechRecognitionLike = {
   stop: () => void;
 };
 
+const QUICK_QUESTIONS: { en: string; ta: string; icon: string }[] = [
+  { en: "What should I do today?", ta: "இன்று நான் என்ன செய்ய வேண்டும்?", icon: "📅" },
+  { en: "This month's milk income?", ta: "இந்த மாதம் பால் வருமானம் என்ன?", icon: "🥛" },
+  { en: "Total expenses this year?", ta: "இந்த ஆண்டு மொத்த செலவு என்ன?", icon: "💸" },
+  { en: "Whose motor turn today?", ta: "இன்று யாருடைய மோட்டார் முறை?", icon: "🚰" },
+  { en: "Active crops summary?", ta: "செயலில் உள்ள பயிர்கள் சுருக்கம்?", icon: "🌾" },
+  { en: "Pending milk payments?", ta: "நிலுவையில் உள்ள பால் பணம்?", icon: "💰" },
+];
+
 const buildWelcomeMessage = (language: "ta" | "en"): Message => ({
   id: Date.now(),
   role: "assistant",
@@ -72,6 +81,7 @@ export default function ChatWidget({ language = "en" }: { language?: "ta" | "en"
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -89,6 +99,7 @@ export default function ChatWidget({ language = "en" }: { language?: "ta" | "en"
   const clearChat = () => {
     setMessages([buildWelcomeMessage(language)]);
     window.localStorage.removeItem(CHAT_HISTORY_KEY);
+    setShowSuggestions(true);
   };
 
   const cycleFontSize = () => {
@@ -109,6 +120,7 @@ export default function ChatWidget({ language = "en" }: { language?: "ta" | "en"
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
+    setShowSuggestions(false);
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -257,23 +269,6 @@ export default function ChatWidget({ language = "en" }: { language?: "ta" | "en"
     };
   };
 
-  const suggestedQuestions =
-    language === "ta"
-      ? [
-          "எந்த பயிர் அதிக லாபம் தருகிறது?",
-          "மஞ்சள் சாகுபடி முழு செயல்முறை என்ன?",
-          "அடுத்த சீசனில் என்ன பயிர் பயிரிடலாம்?",
-          "இந்த மாதம் பால் வருமானம் எவ்வளவு?",
-          "டிராக்டர் ஆயில் மாற்ற எத்தனை மணி?",
-        ]
-      : [
-          "Which crop gives highest profit?",
-          "What is the complete turmeric cultivation process?",
-          "What crop should I plant next season?",
-          "What is my milk income this month?",
-          "How many hours until tractor oil change?",
-        ];
-
   return (
     <>
       {/* Chat toggle button */}
@@ -401,17 +396,21 @@ export default function ChatWidget({ language = "en" }: { language?: "ta" | "en"
           </div>
 
           {/* Suggested questions */}
-          {messages.length === 1 && (
+          {showSuggestions && messages.length <= 1 && (
             <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-2">{language === "ta" ? "கேள்விகள்:" : "Try asking:"}</p>
-              <div className="flex flex-wrap gap-1">
-                {suggestedQuestions.map((q, i) => (
+              <p className="text-xs text-gray-500 mb-2">💡 {language === "ta" ? "விரைவு கேள்விகள்" : "Quick questions"}</p>
+              <div className="flex flex-col gap-1">
+                {QUICK_QUESTIONS.map((q, i) => (
                   <button
                     key={i}
-                    onClick={() => sendMessage(q)}
-                    className="text-xs bg-green-50 text-green-800 border border-green-200 rounded-full px-2 py-1 hover:bg-green-100 transition-colors"
+                    onClick={() => {
+                      sendMessage(language === "ta" ? q.ta : q.en);
+                      setShowSuggestions(false);
+                    }}
+                    className="flex items-center gap-2 text-xs bg-green-50 text-green-800 border border-green-200 rounded-lg px-2.5 py-1.5 hover:bg-green-100 transition-colors text-left"
                   >
-                    {q}
+                    <span>{q.icon}</span>
+                    <span>{language === "ta" ? q.ta : q.en}</span>
                   </button>
                 ))}
               </div>
