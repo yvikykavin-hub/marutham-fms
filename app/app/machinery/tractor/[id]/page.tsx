@@ -1186,6 +1186,8 @@ function MaintenanceTab({ lang, tractorId }: { lang: "ta" | "en"; tractorId: str
         dateField="date"
         filterColumn="tractor_id"
         filterValue={tractorId}
+        collapsible={true}
+        defaultOpen={false}
         fields={[
           { key: "date", en: "Date", ta: "தேதி", type: "date", required: true },
           { key: "amount", en: "Cost (₹)", ta: "செலவு (₹)", type: "number", required: true, isCost: true },
@@ -1200,6 +1202,8 @@ function MaintenanceTab({ lang, tractorId }: { lang: "ta" | "en"; tractorId: str
         dateField="date"
         filterColumn="tractor_id"
         filterValue={tractorId}
+        collapsible={true}
+        defaultOpen={false}
         fields={[
           { key: "date", en: "Date", ta: "தேதி", type: "date", required: true },
           { key: "amount", en: "Cost (₹)", ta: "செலவு (₹)", type: "number", required: true, isCost: true },
@@ -1215,6 +1219,8 @@ function MaintenanceTab({ lang, tractorId }: { lang: "ta" | "en"; tractorId: str
         showLastDate
         filterColumn="tractor_id"
         filterValue={tractorId}
+        collapsible={true}
+        defaultOpen={false}
         fields={[
           { key: "date", en: "Date", ta: "தேதி", type: "date", required: true },
           { key: "brand", en: "Battery Brand/Model", ta: "பேட்டரி பிராண்ட்/மாடல்", type: "text" },
@@ -1230,6 +1236,8 @@ function MaintenanceTab({ lang, tractorId }: { lang: "ta" | "en"; tractorId: str
         dateField="date"
         filterColumn="tractor_id"
         filterValue={tractorId}
+        collapsible={true}
+        defaultOpen={false}
         fields={[
           { key: "date", en: "Date", ta: "தேதி", type: "date", required: true },
           { key: "tyre_type", en: "Tyre Type", ta: "டயர் வகை", type: "text" },
@@ -1246,6 +1254,8 @@ function MaintenanceTab({ lang, tractorId }: { lang: "ta" | "en"; tractorId: str
         dateField="date"
         filterColumn="tractor_id"
         filterValue={tractorId}
+        collapsible={true}
+        defaultOpen={false}
         fields={[
           { key: "date", en: "Date", ta: "தேதி", type: "date", required: true },
           {

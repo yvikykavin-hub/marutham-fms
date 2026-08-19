@@ -157,6 +157,63 @@ function TogglePill({
   );
 }
 
+function CollapsibleCard({
+  id,
+  title,
+  icon,
+  openSection,
+  onToggle,
+  children,
+}: {
+  id: string;
+  title: string;
+  icon: string;
+  openSection: string | null;
+  onToggle: (id: string) => void;
+  children: React.ReactNode;
+}) {
+  const isOpen = openSection === id;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-slate-700">
+      {/* Header - clickable */}
+      <button
+        onClick={() => onToggle(id)}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+      >
+        <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+          <span>{icon}</span>
+          <span>{title}</span>
+        </h2>
+        <motion.span
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-gray-400 text-xs flex-shrink-0"
+        >
+          ▼
+        </motion.span>
+      </button>
+
+      {/* Content */}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 border-t border-gray-100 dark:border-slate-700 pt-3">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function LandDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -168,6 +225,12 @@ export default function LandDetailPage() {
   const [farm, setFarm] = useState<Farm | null>(null);
   const [loading, setLoading] = useState(true);
   const { isOpen: deleteOpen, confirmDelete, handleConfirm: handleDeleteConfirm, handleCancel: handleDeleteCancel } = useDeleteConfirm();
+
+  // Overview tab accordion — Basic Info open by default, others closed.
+  const [openSection, setOpenSection] = useState<string | null>("basic");
+  const toggleSection = (section: string) => {
+    setOpenSection((prev) => (prev === section ? null : section));
+  };
 
   const showToast = (msg: string) => toast.success(msg);
 
@@ -573,8 +636,7 @@ export default function LandDetailPage() {
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="flex flex-col gap-3">
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-2">{L("Basic Info", "அடிப்படை தகவல்")}</h2>
+              <CollapsibleCard id="basic" title={L("Basic Info", "அடிப்படை தகவல்")} icon="📋" openSection={openSection} onToggle={toggleSection}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                   <div>
                     <label className={labelCls}>{L("Farm Name (English)", "பண்ணை பெயர் (English)")}</label>
@@ -617,10 +679,9 @@ export default function LandDetailPage() {
                 >
                   {savingBasic ? "..." : L("Save", "சேமி")}
                 </button>
-              </div>
+              </CollapsibleCard>
 
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-2">{L("Soil Details", "மண் விவரங்கள்")}</h2>
+              <CollapsibleCard id="soil" title={L("Soil Details", "மண் விவரங்கள்")} icon="🌱" openSection={openSection} onToggle={toggleSection}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                   <div>
                     <label className={labelCls}>{L("Soil Type", "மண் வகை")}</label>
@@ -654,10 +715,9 @@ export default function LandDetailPage() {
                 >
                   {savingSoil ? "..." : L("Save", "சேமி")}
                 </button>
-              </div>
+              </CollapsibleCard>
 
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-2">{L("Land Records", "நில பதிவுகள்")}</h2>
+              <CollapsibleCard id="records" title={L("Land Records", "நில பதிவுகள்")} icon="📄" openSection={openSection} onToggle={toggleSection}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                   <div>
                     <label className={labelCls}>{L("Survey Number", "சர்வே எண்")}</label>
@@ -675,10 +735,9 @@ export default function LandDetailPage() {
                 >
                   {savingBasic ? "..." : L("Save", "சேமி")}
                 </button>
-              </div>
+              </CollapsibleCard>
 
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-2">{L("Well & Motor", "கிணறு & மோட்டார்")}</h2>
+              <CollapsibleCard id="motor" title={L("Well & Motor", "கிணறு & மோட்டார்")} icon="💧" openSection={openSection} onToggle={toggleSection}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <label className="text-xs text-gray-700">{L("Well", "கிணறு")}</label>
@@ -739,7 +798,7 @@ export default function LandDetailPage() {
                 </button>
 
                 {(well || motor) && <MotorSharingSection ref={motorSharingRef} farmId={id} language={lang} />}
-              </div>
+              </CollapsibleCard>
             </div>
           )}
 

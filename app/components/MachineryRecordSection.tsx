@@ -2,6 +2,7 @@
 
 import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { isFutureDate, getValidationMessage } from "../lib/validation";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
@@ -33,6 +34,10 @@ type Props = {
   // fetch/insert/update are all filtered to filterColumn = filterValue.
   filterColumn?: string;
   filterValue?: string;
+  // When true, the card becomes an expand/collapse section (header tap toggles
+  // it) instead of the default always-expanded card.
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 };
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
@@ -59,6 +64,8 @@ export default function MachineryRecordSection({
   onChanged,
   filterColumn,
   filterValue,
+  collapsible = false,
+  defaultOpen = true,
 }: Props) {
   const L = (en: string, ta: string) => (lang === "ta" ? ta : en);
 
@@ -70,6 +77,7 @@ export default function MachineryRecordSection({
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const costField = fields.find((f) => f.isCost)?.key;
 
@@ -171,15 +179,10 @@ export default function MachineryRecordSection({
     });
   };
 
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-800">{icon} {L(titleEn, titleTa)}</h2>
-        <button onClick={openAdd} className="bg-primary hover:bg-primary/90 text-white rounded-lg px-3 py-1.5 text-xs font-semibold transition">
-          + {L("Add", "சேர்க்க")}
-        </button>
-      </div>
-
+  // Shared records list/table content — identical markup used by both the
+  // non-collapsible (unchanged) and collapsible render paths below.
+  const recordsBody = (
+    <>
       {showLastDate && (
         <p className="text-xs text-gray-600 mb-2">
           {L("Last replaced", "கடைசியாக மாற்றப்பட்டது")}: <span className="font-semibold text-gray-900">{formatDMY(records[0]?.[dateField] as string | undefined)}</span>
@@ -244,6 +247,71 @@ export default function MachineryRecordSection({
           </table>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <>
+    {!collapsible ? (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <h2 className="text-sm font-semibold text-gray-800">{icon} {L(titleEn, titleTa)}</h2>
+          <button onClick={openAdd} className="bg-primary hover:bg-primary/90 text-white rounded-lg px-3 py-1.5 text-xs font-semibold transition">
+            + {L("Add", "சேர்க்க")}
+          </button>
+        </div>
+        {recordsBody}
+      </div>
+    ) : (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Clickable header */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">{icon}</span>
+            <h2 className="text-sm font-semibold text-gray-800">{L(titleEn, titleTa)}</h2>
+            {/* Show record count when collapsed */}
+            {!isOpen && records.length > 0 && (
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                {records.length}
+              </span>
+            )}
+          </div>
+
+          <motion.span
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-gray-400 text-xs flex-shrink-0"
+          >
+            ▼
+          </motion.span>
+        </button>
+
+        {/* Collapsible content */}
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                <div className="flex justify-end mb-2">
+                  <button onClick={openAdd} className="bg-primary hover:bg-primary/90 text-white rounded-lg px-3 py-1.5 text-xs font-semibold transition">
+                    + {L("Add", "சேர்க்க")}
+                  </button>
+                </div>
+                {recordsBody}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )}
 
       {modalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-0">
@@ -302,6 +370,6 @@ export default function MachineryRecordSection({
       )}
 
       <DeleteConfirmDialog isOpen={deleteOpen} onConfirm={handleDeleteConfirm} onCancel={handleDeleteCancel} language={lang} />
-    </div>
+    </>
   );
 }
