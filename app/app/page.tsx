@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "../components/Sidebar";
 import { StaggerContainer, StaggerItem } from "../components/AnimatedContainer";
 import { SuccessCheckmark } from "../components/SuccessAnimation";
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [hasMotor, setHasMotor] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showAddFarmModal, setShowAddFarmModal] = useState(false);
   const { isOpen: deleteOpen, confirmDelete, handleConfirm: handleDeleteConfirm, handleCancel: handleDeleteCancel } = useDeleteConfirm();
 
   useEffect(() => {
@@ -117,6 +119,7 @@ export default function Dashboard() {
         setArea("");
         setHasWell(true);
         setHasMotor(true);
+        setShowAddFarmModal(false);
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 2000);
         fetchFarms();
@@ -163,6 +166,8 @@ export default function Dashboard() {
     loading: lang === "ta" ? "ஏற்றுகிறது..." : "Loading...",
     noFarms: lang === "ta" ? "நிலங்கள் எதுவும் இல்லை. மேலே சேர்க்கவும்." : "No farms yet. Add one above.",
     acres: lang === "ta" ? "ஏக்கர்" : "Acres",
+    addNewFarm: lang === "ta" ? "புதிய பண்ணை சேர்" : "Add New Farm",
+    cancel: lang === "ta" ? "ரத்து" : "Cancel",
   };
 
   return (
@@ -189,19 +194,9 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
+                <DarkModeToggle />
                 <VoiceAgent language={lang} />
                 <NotificationBell language={lang} />
-                <DarkModeToggle />
-                {/* Language Toggle */}
-                <button
-                  onClick={() => setLang(lang === "ta" ? "en" : "ta")}
-                  className="min-h-[44px] px-3 py-2 sm:px-4 sm:py-2 rounded-lg border border-primary/40 text-primary text-xs font-medium hover:bg-green-50 transition"
-                >
-                  {lang === "ta" ? "English" : "தமிழ்"}
-                </button>
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-2xl border-2 border-green-200 shrink-0">
-                  🧑‍🌾
-                </div>
               </div>
             </div>
 
@@ -235,62 +230,20 @@ export default function Dashboard() {
             ))}
           </StaggerContainer>
 
-          {/* Add Farm */}
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center text-xs">➕</span>
-              {t.addFarm}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-              <input
-                type="text"
-                placeholder={t.farmName}
-                value={farmName}
-                onChange={(e) => setFarmName(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all duration-200"
-              />
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                onKeyDown={(e) => { if (e.key === "-") e.preventDefault(); }}
-                placeholder={t.areaAcres}
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all duration-200"
-              />
-              <select
-                value={hasWell ? "yes" : "no"}
-                onChange={(e) => setHasWell(e.target.value === "yes")}
-                className="w-full min-h-[44px] px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all duration-200 cursor-pointer"
-              >
-                <option className="text-gray-900" value="yes">{t.well}: {t.yes}</option>
-                <option className="text-gray-900" value="no">{t.well}: {t.no}</option>
-              </select>
-              <select
-                value={hasMotor ? "yes" : "no"}
-                onChange={(e) => setHasMotor(e.target.value === "yes")}
-                className="w-full min-h-[44px] px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all duration-200 cursor-pointer"
-              >
-                <option className="text-gray-900" value="yes">{t.motor}: {t.yes}</option>
-                <option className="text-gray-900" value="no">{t.motor}: {t.no}</option>
-              </select>
-              <button
-                onClick={addFarm}
-                disabled={saving}
-                className="w-full min-h-[44px] bg-[#2D6A4F] hover:bg-[#245A42] disabled:bg-primary/40 text-white font-medium text-sm px-3 py-2 sm:px-4 sm:py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow active:scale-95"
-              >
-                {saving ? "..." : t.save}
-              </button>
-            </div>
-          </div>
-
           {/* Farms List */}
           <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-3">
-            <h2 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center text-xs">🌳</span>
-              {t.myFarms}
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <span className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center text-xs">🌳</span>
+                {t.myFarms}
+              </h2>
+              <button
+                onClick={() => setShowAddFarmModal(true)}
+                className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl px-3 py-1.5 text-xs font-medium transition shadow-sm active:scale-95"
+              >
+                + {t.addFarm}
+              </button>
+            </div>
 
             {farms.length === 0 ? (
               <EmptyState
@@ -343,6 +296,118 @@ export default function Dashboard() {
         </div>
         </PullToRefresh>
       </main>
+
+      {/* Add Farm Modal */}
+      <AnimatePresence>
+        {showAddFarmModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddFarmModal(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-x-4 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl z-50 p-5 pb-8 sm:pb-5"
+            >
+              {/* Handle bar (mobile) */}
+              <div className="flex justify-center mb-4 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-slate-600" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  🏡 {t.addNewFarm}
+                </h2>
+                <button
+                  onClick={() => setShowAddFarmModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-gray-500 text-sm active:scale-95"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Form fields - same as before */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block mb-0.5 text-xs text-gray-600 dark:text-gray-400">
+                    {t.farmName}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t.farmName}
+                    value={farmName}
+                    onChange={(e) => setFarmName(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-0.5 text-xs text-gray-600 dark:text-gray-400">
+                    {t.areaAcres}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    onKeyDown={(e) => { if (e.key === "-") e.preventDefault(); }}
+                    placeholder="0.00"
+                    value={area}
+                    onChange={(e) => setArea(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={hasWell ? "yes" : "no"}
+                    onChange={(e) => setHasWell(e.target.value === "yes")}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    <option className="text-gray-900" value="yes">{t.well}: {t.yes}</option>
+                    <option className="text-gray-900" value="no">{t.well}: {t.no}</option>
+                  </select>
+                  <select
+                    value={hasMotor ? "yes" : "no"}
+                    onChange={(e) => setHasMotor(e.target.value === "yes")}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    <option className="text-gray-900" value="yes">{t.motor}: {t.yes}</option>
+                    <option className="text-gray-900" value="no">{t.motor}: {t.no}</option>
+                  </select>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => setShowAddFarmModal(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-700 text-sm font-medium text-gray-600 dark:text-gray-400 active:scale-95 transition-all"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={addFarm}
+                    disabled={saving}
+                    className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:bg-primary/40 text-white text-sm font-medium active:scale-95 transition-all"
+                  >
+                    {saving ? "..." : t.save}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <ChatWidget language={lang} />
       <SuccessCheckmark show={showSuccess} message={lang === "ta" ? "சேமிக்கப்பட்டது!" : "Saved!"} />
       <DeleteConfirmDialog isOpen={deleteOpen} onConfirm={handleDeleteConfirm} onCancel={handleDeleteCancel} language={lang} />

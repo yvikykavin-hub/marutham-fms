@@ -2,6 +2,7 @@
 
 import toast from "react-hot-toast";
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { extractMilkCardData, type MilkCardRow } from "../lib/geminiOCR";
@@ -154,6 +155,7 @@ export default function MilkCollectionSection({
 }) {
   const router = useRouter();
   const rateTable = animalType === "buffalo" ? "buffalo_milk_rates" : "milk_rates";
+  const L = (en: string, ta: string) => (lang === "ta" ? ta : en);
 
   const [rates, setRates] = useState<MilkRate[]>([]);
   const [collections, setCollections] = useState<MilkCollection[]>([]);
@@ -169,9 +171,8 @@ export default function MilkCollectionSection({
   // All sections default to collapsed and reset whenever the cow/buffalo tab changes,
   // so switching tabs never leaves a stale expanded section from the other animal.
   const [showMilkRate, setShowMilkRate] = useState(false);
-  const [showMonthly, setShowMonthly] = useState(false);
-  const [showWeekly, setShowWeekly] = useState(false);
-  const [showYearly, setShowYearly] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryPeriod, setSummaryPeriod] = useState<"monthly" | "weekly" | "yearly">("monthly");
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
@@ -179,9 +180,8 @@ export default function MilkCollectionSection({
     // avoids the cascading-render lint warning while still resetting before paint.
     Promise.resolve().then(() => {
       setShowMilkRate(false);
-      setShowMonthly(false);
-      setShowWeekly(false);
-      setShowYearly(false);
+      setShowSummary(false);
+      setSummaryPeriod("monthly");
       setShowHistory(false);
     });
   }, [animalType]);
@@ -1065,157 +1065,200 @@ export default function MilkCollectionSection({
         </div>
       </div>
 
-      {/* Monthly Summary (collapsible) */}
-      <CollapsibleSection
-        label={t(lang, "monthlySummary")}
-        icon="📅"
-        isOpen={showMonthly}
-        onToggle={() => setShowMonthly(!showMonthly)}
-        badge={selectedMonthYear}
-      >
-        <div className="flex justify-end mb-3 mt-3">
-          <input
-            type="month"
-            value={selectedMonthYear}
-            onChange={(e) => setSelectedMonthYear(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900"
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">{t(lang, "totalLitres")}</p>
-            <p className="text-lg font-bold text-gray-800">{monthTotalLitres.toFixed(1)} L</p>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">{t(lang, "expectedIncome")}</p>
-            <p className="text-lg font-bold text-success">{inr(monthTotalIncome)}</p>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">{t(lang, "daysRecorded")}</p>
-            <p className="text-lg font-bold text-gray-800">{daysRecorded}</p>
-          </div>
-        </div>
-      </CollapsibleSection>
+      {/* Combined Summary Section (Monthly / Weekly / Yearly) */}
+      <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800">
+        <button
+          onClick={() => setShowSummary(!showSummary)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors min-h-[44px]"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+            📊 {L("Summary", "சுருக்கம்")}
+          </span>
+          <motion.span
+            animate={{ rotate: showSummary ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-gray-400 text-xs"
+          >
+            ▼
+          </motion.span>
+        </button>
 
-      {/* Weekly Breakdown (collapsible) */}
-      <CollapsibleSection
-        label={t(lang, "weeklyBreakdown")}
-        icon="📊"
-        isOpen={showWeekly}
-        onToggle={() => setShowWeekly(!showWeekly)}
-        badge={selectedMonthYear}
-      >
-        <div className="mt-3">
-          {weeks.length === 0 ? (
-            <EmptyState type="milk" title={t(lang, "noRecordsYet")} className="py-4" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-gray-500 uppercase text-[10px] tracking-wide border-b">
-                    <th className="py-1 px-1">{t(lang, "week")}</th>
-                    <th className="py-1 px-1">{t(lang, "date")}</th>
-                    <th className="py-1 px-1">{t(lang, "totalLitres")}</th>
-                    <th className="py-1 px-1">{t(lang, "expectedIncome")}</th>
-                    <th className="py-1 px-1"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeks.map((w) => (
-                    <tr key={w.weekNum} className="border-b border-gray-50 text-gray-900">
-                      <td className="py-1 px-1 font-medium">{t(lang, "week")} {w.weekNum}</td>
-                      <td className="py-1 px-1 text-gray-700">{formatDMY(w.start)} → {formatDMY(w.end)}</td>
-                      <td className="py-1 px-1">{w.litres.toFixed(1)} L</td>
-                      <td className="py-1 px-1 text-green-600 font-medium">{inr(w.income)}</td>
-                      <td className="py-1 px-1">
-                        {w.isPaymentWeek && (
-                          <span className="bg-amber-100 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
-                            💰 {t(lang, "paymentWeek")}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+        <AnimatePresence>
+          {showSummary && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-4 pt-2 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-700">
+
+                {/* Period toggle */}
+                <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 mb-4">
+                  {(
+                    [
+                      { key: "monthly" as const, en: "Monthly", ta: "மாதாந்திர" },
+                      { key: "weekly" as const, en: "Weekly", ta: "வாராந்திர" },
+                      { key: "yearly" as const, en: "Yearly", ta: "ஆண்டு" },
+                    ]
+                  ).map((period) => (
+                    <button
+                      key={period.key}
+                      onClick={() => setSummaryPeriod(period.key)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        summaryPeriod === period.key
+                          ? "bg-white dark:bg-slate-600 text-green-700 dark:text-green-400 shadow-sm"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
+                      {L(period.en, period.ta)}
+                    </button>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                {/* Monthly content */}
+                {summaryPeriod === "monthly" && (
+                  <div>
+                    <div className="flex justify-end mb-3">
+                      <input
+                        type="month"
+                        value={selectedMonthYear}
+                        onChange={(e) => setSelectedMonthYear(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500">{t(lang, "totalLitres")}</p>
+                        <p className="text-lg font-bold text-gray-800">{monthTotalLitres.toFixed(1)} L</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500">{t(lang, "expectedIncome")}</p>
+                        <p className="text-lg font-bold text-success">{inr(monthTotalIncome)}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500">{t(lang, "daysRecorded")}</p>
+                        <p className="text-lg font-bold text-gray-800">{daysRecorded}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Weekly content */}
+                {summaryPeriod === "weekly" && (
+                  <div>
+                    {weeks.length === 0 ? (
+                      <EmptyState type="milk" title={t(lang, "noRecordsYet")} className="py-4" />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-gray-500 uppercase text-[10px] tracking-wide border-b">
+                              <th className="py-1 px-1">{t(lang, "week")}</th>
+                              <th className="py-1 px-1">{t(lang, "date")}</th>
+                              <th className="py-1 px-1">{t(lang, "totalLitres")}</th>
+                              <th className="py-1 px-1">{t(lang, "expectedIncome")}</th>
+                              <th className="py-1 px-1"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {weeks.map((w) => (
+                              <tr key={w.weekNum} className="border-b border-gray-50 text-gray-900">
+                                <td className="py-1 px-1 font-medium">{t(lang, "week")} {w.weekNum}</td>
+                                <td className="py-1 px-1 text-gray-700">{formatDMY(w.start)} → {formatDMY(w.end)}</td>
+                                <td className="py-1 px-1">{w.litres.toFixed(1)} L</td>
+                                <td className="py-1 px-1 text-green-600 font-medium">{inr(w.income)}</td>
+                                <td className="py-1 px-1">
+                                  {w.isPaymentWeek && (
+                                    <span className="bg-amber-100 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                                      💰 {t(lang, "paymentWeek")}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Yearly content */}
+                {summaryPeriod === "yearly" && (
+                  <div>
+                    <div className="flex items-center justify-end mb-3 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={chartYear}
+                          onChange={(e) => setChartYear(parseInt(e.target.value, 10))}
+                          className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm bg-white text-gray-900 min-h-[44px] sm:min-h-0 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500"
+                        >
+                          {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                        <button
+                          onClick={fetchCollections}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-xs sm:text-sm font-medium hover:bg-green-50 transition min-h-[44px] sm:min-h-0"
+                        >
+                          🔄 {t(lang, "refresh")}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500">{t(lang, "totalLitres")}</p>
+                        <p className="text-lg font-bold text-gray-800">{yearTotalLitres.toFixed(1)} L</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500">{t(lang, "expectedIncome")}</p>
+                        <p className="text-lg font-bold text-success">{inr(yearTotalIncome)}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-700 mb-2">{t(lang, "monthlyIncomeChart")}</h3>
+                        <div className="overflow-x-auto">
+                          <div style={{ minWidth: 320, height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={monthlyChartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                                <YAxis tick={{ fontSize: 10 }} />
+                                <Tooltip formatter={(value) => inr(Number(value))} />
+                                <Legend />
+                                <Bar dataKey="income" name={t(lang, "income")} fill="#22c55e" isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-700 mb-2">{t(lang, "monthlyLitresChart")}</h3>
+                        <div className="overflow-x-auto">
+                          <div style={{ minWidth: 320, height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={monthlyChartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                                <YAxis tick={{ fontSize: 10 }} />
+                                <Tooltip formatter={(value) => `${value} L`} />
+                                <Legend />
+                                <Bar dataKey="litres" name={t(lang, "totalLitres")} fill="#3b82f6" isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           )}
-        </div>
-      </CollapsibleSection>
-
-      {/* Yearly Summary (collapsible) */}
-      <CollapsibleSection
-        label={t(lang, "yearlySummary")}
-        icon="📈"
-        isOpen={showYearly}
-        onToggle={() => setShowYearly(!showYearly)}
-        badge={String(chartYear)}
-      >
-        <div className="flex items-center justify-end mb-3 mt-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <select
-              value={chartYear}
-              onChange={(e) => setChartYear(parseInt(e.target.value, 10))}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm bg-white text-gray-900 min-h-[44px] sm:min-h-0 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500"
-            >
-              {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <button
-              onClick={fetchCollections}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-xs sm:text-sm font-medium hover:bg-green-50 transition min-h-[44px] sm:min-h-0"
-            >
-              🔄 {t(lang, "refresh")}
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">{t(lang, "totalLitres")}</p>
-            <p className="text-lg font-bold text-gray-800">{yearTotalLitres.toFixed(1)} L</p>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">{t(lang, "expectedIncome")}</p>
-            <p className="text-lg font-bold text-success">{inr(yearTotalIncome)}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <h3 className="text-xs font-semibold text-gray-700 mb-2">{t(lang, "monthlyIncomeChart")}</h3>
-            <div className="overflow-x-auto">
-              <div style={{ minWidth: 320, height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(value) => inr(Number(value))} />
-                    <Legend />
-                    <Bar dataKey="income" name={t(lang, "income")} fill="#22c55e" isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold text-gray-700 mb-2">{t(lang, "monthlyLitresChart")}</h3>
-            <div className="overflow-x-auto">
-              <div style={{ minWidth: 320, height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(value) => `${value} L`} />
-                    <Legend />
-                    <Bar dataKey="litres" name={t(lang, "totalLitres")} fill="#3b82f6" isAnimationActive={true} animationBegin={0} animationDuration={800} animationEasing="ease-out" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
-      </CollapsibleSection>
+        </AnimatePresence>
+      </div>
 
       {/* Collection History (collapsible) */}
       <CollapsibleSection
